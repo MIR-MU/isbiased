@@ -8,8 +8,12 @@ from transformers import AutoModelForQuestionAnswering
 
 from learnedMixinH.objective import LearnedMixinH
 
+# parameters
 model_name = "bert-base-multilingual-cased"
 biased_model_path = "bert-base-multilingual-cased"
+
+num_val_samples = 200
+# end parameters
 
 lang_module = LangModule(model_name)
 
@@ -23,7 +27,7 @@ training_arguments = AdaptationArguments(output_dir="checkpoint_dir",
                                          warmup_steps=1000,
                                          max_steps=100000,
                                          gradient_accumulation_steps=5,
-                                         eval_steps=200,
+                                         eval_steps=1,
                                          logging_steps=100,
                                          save_steps=1000,
                                          num_train_epochs=30,
@@ -40,9 +44,9 @@ mixin_objective = LearnedMixinH(lang_module,
                                 texts_or_path=squad_train["question"],
                                 text_pair_or_path=squad_train["context"],
                                 labels_or_path=[a["text"][0] for a in squad_train["answers"]],
-                                val_texts_or_path=squad_en["validation"]["question"][:200],
-                                val_text_pair_or_path=squad_en["validation"]["context"][:200],
-                                val_labels_or_path=[a["text"][0] for a in squad_en["validation"]["answers"]][:200],
+                                val_texts_or_path=squad_en["validation"]["question"][:num_val_samples],
+                                val_text_pair_or_path=squad_en["validation"]["context"][:num_val_samples],
+                                val_labels_or_path=[a["text"][0] for a in squad_en["validation"]["answers"]][:num_val_samples],
                                 batch_size=3,
                                 val_evaluators=val_metrics,
                                 objective_id="SQUAD-en")

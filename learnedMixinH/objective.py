@@ -22,7 +22,6 @@ class LearnedMixinH(ExtractiveQA):
         self.biased_model = biased_model
         self.penalty = penalty
 
-        # TODO: set automatically: hidden_size = self.compatible_head_model.something
         self.learned_bias_scalar = torch.nn.Linear(in_features=2 * self.compatible_head_model.config.hidden_size,
                                                    out_features=1,
                                                    device=self.compatible_head_model.device)
