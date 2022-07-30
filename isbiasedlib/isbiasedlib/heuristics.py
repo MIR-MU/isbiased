@@ -315,6 +315,21 @@ class ComputeHeuristics:
         self.data['max_sim_ents'] = self.count_similar_NER_from_context_to_answer()
         self.data['answer_subject_positions'] = self.extract_answer_position_with_respect_to_subject()
 
+    def compute_heuristic(self, heuristic_name: str):        
+        if heuristic_name == 'similar_words':
+            self.data['similar_words'] = self.count_similar_words_in_question_and_context()
+        elif heuristic_name == 'distances':
+            self.data['distances'], self.data['closest_words'] = self.count_lowest_position_of_word_from_question_in_context()
+        elif heuristic_name == 'kth_sentence':
+            self.data['kth_sentence'] = self.identify_in_which_sentence_answer_is()
+        elif heuristic_name == 'cosine_similarity':
+            self.data['cosine_similarity'] = self.compute_similarity_between_context_and_question()
+        elif heuristic_name == 'answer_lenght':
+            self.data['answer_lenght'] = self.average_answer_length()
+        elif heuristic_name == 'max_sim_ents':
+            self.data['max_sim_ents'] = self.count_similar_NER_from_context_to_answer()
+        elif heuristic_name == 'answer_subject_positions':
+            self.data['answer_subject_positions'] = self.extract_answer_position_with_respect_to_subject()
 
     def save_dataset_with_computed_heuristics(self, name: str):
         self.data.to_json(f"{name}_with_computed_heuristics.json", orient='records')
