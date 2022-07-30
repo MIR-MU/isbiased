@@ -95,23 +95,23 @@ class BiasSignificanceMeasure:
             return False, distance_between_intervals
     
 
-    def compute_metrics_average_split(self, field, threshold):
+    def compute_metrics_average_split(self, heuristic, threshold):
         """Function which calls the previous ones and provide dataset splits and logging into files
 
         Args:
-            field (str): column of the dataset based on which we want to split the data
+            heuristic (str): column of the dataset based on which we want to split the data
             threshold (decimal): number for the split of dataset, the values lower or equal will be in one subset and values higher than the threshold will be in the other
 
         Returns:
             decimal, decimal: distances for both metrics, exact match and F1
         """
 
-        if field == 'distances':
-            data_higher, data_lower = [x for _, x in self.data[self.data.distances >= 0].groupby(self.data[field] <= threshold)]
-        elif field == 'answer_subject_positions':
-            data_higher, data_lower = [x for _, x in self.data[self.data.answer_subject_positions >= 0].groupby(self.data[field] <= threshold)]
+        if heuristic == 'distances':
+            data_higher, data_lower = [x for _, x in self.data[self.data.distances >= 0].groupby(self.data[heuristic] <= threshold)]
+        elif heuristic == 'answer_subject_positions':
+            data_higher, data_lower = [x for _, x in self.data[self.data.answer_subject_positions >= 0].groupby(self.data[heuristic] <= threshold)]
         else:            
-            data_higher, data_lower = [x for _, x in self.data.groupby(self.data[field] <= threshold)]
+            data_higher, data_lower = [x for _, x in self.data.groupby(self.data[heuristic] <= threshold)]
 
         if len(data_higher) < self.sample_size or len(data_lower) < self.sample_size:
             return -1, -1
@@ -159,14 +159,31 @@ class BiasSignificanceMeasure:
 
         # print(f"Average f1 with params: samples {self.sample_size} iters {self.iterations} ---- are independent: {is_not_overlap_f1} the distance is: {distance_f1}")
 
-        return distance_em, distance_f1
+        return [distance_em, distance_f1, len(data_lower), len(data_higher), mean(lower_exact_match_quantile_975), mean(higher_exact_match_quantile_975)]
+    
+
+    def find_best_threshold_for_heuristic(self, distances_dictionary: dict):
+        best_threshold = 0
+        max_distance = -1
+        size_of_smaller = 0
+        times_4 = 0
+
+        for key, value in zip(distances_dictionary.keys(), distances_dictionary.values()):
+            if (value[0] > max_distance and max_distance == -1)  or (max_distance != -1 and value[0] > max_distance and value[2] > self.sample_size*2 and value[3] > self.sample_size*2): # and value[0] > times_4 * 2): #or (max_distance != -1 and value[0] > max_distance and value[2] > self.sample_size*4 and value[3] > self.sample_size*4)
+                max_distance = value[0]
+                best_threshold = key
+                size_of_smaller = value[2] if value[2] < value[3] else value[3]
+                if size_of_smaller > self.sample_size*4:
+                    times_4 = max_distance
+        
+        return best_threshold
 
 
-    def find_longest_distance(self, field):
+    def find_longest_distance(self, heuristic):
         """Finds out the longest distance between intervals for bunch of thresholds
 
         Args:
-            field (str): Dataframe column
+            heuristic (str): Dataframe column
             low_bound (int): the number from which the threshold will start from
             upp_bound (int): the number for which the threshold will go -1
         """
@@ -179,21 +196,24 @@ class BiasSignificanceMeasure:
         distance_em = 0
         distance_f1 = 0
 
-        min_value_for_threshold = self.data[field].min() if self.data[field].min() >= 0 else 0
-        max_value_for_threshold = self.data[field].max()
+        min_value_for_threshold = int(self.data[heuristic].min()) + 1 if self.data[heuristic].min() > 0 else 0
+        max_value_for_threshold = self.data[heuristic].max()
 
         # print(f"Min value: {min_value_for_threshold} and max value: {max_value_for_threshold}")
 
         while(min_value_for_threshold < max_value_for_threshold):
-            distance_em, distance_f1 = self.compute_metrics_average_split(field, min_value_for_threshold)
+            # distance_em, distance_f1 = self.compute_metrics_average_split(heuristic, min_value_for_threshold)
+            distances_dict[min_value_for_threshold] = self.compute_metrics_average_split(heuristic, min_value_for_threshold)
             if distance_em > max_em_distance:
-                max_em_distance = distance_em
+                # max_em_distance = distance_em
+                max_em_distance = distances_dict.get(min_value_for_threshold)[0]
                 index_em = min_value_for_threshold
             if distance_f1 > max_f1_distance:
-                max_f1_distance = distance_f1
+                # max_f1_distance = distance_f1
+                max_f1_distance = distances_dict.get(min_value_for_threshold)[1]
                 index_f1 = min_value_for_threshold
 
-            distances_dict[min_value_for_threshold] = [distance_em, distance_f1]
+            # distances_dict[min_value_for_threshold] = [distance_em, distance_f1]
 
             if max_value_for_threshold > 1:
                 min_value_for_threshold += 1
@@ -410,3 +430,20 @@ class BiasSignificanceMeasure:
         squad_with_heuristics = ComputeHeuristics(self.data, train_dataset)
         squad_with_heuristics.compute_all_heuristics()
         self.data = squad_with_heuristics.data
+    
+    def split_data_by_heuristics(self, dataset: pd.DataFrame, heuristic: str):
+        dist_dict = self.find_longest_distance(heuristic)
+        best_threshold = self.find_best_threshold_for_heuristic(dist_dict)
+        print(best_threshold)
+
+        if best_threshold != -1:
+            comp_heuristic = ComputeHeuristics(dataset, dataset)
+            comp_heuristic.compute_heuristic(heuristic)
+            dataset = comp_heuristic.data
+
+            if dist_dict.get(best_threshold)[4] > dist_dict.get(best_threshold)[5]:
+                unbiasedDataset, biasedDataset = [x for _, x in dataset.groupby(dataset[heuristic] <= best_threshold)]
+            else:
+                biasedDataset, unbiasedDataset = [x for _, x in dataset.groupby(dataset[heuristic] <= best_threshold)]
+
+        return (biasedDataset, unbiasedDataset)
