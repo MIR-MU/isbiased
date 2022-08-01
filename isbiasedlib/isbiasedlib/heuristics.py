@@ -185,16 +185,16 @@ class ComputeHeuristics:
             answers_text.append(self.data['answers'][i]['text'])
         answers_text
 
-        answer_lenght = []
+        answer_length = []
         tokenizer = RegexpTokenizer(r'\w+')
         for i in range(len(self.data)):
             avg_lenght = 0
             for j in range(len(answers_text[i])):
                 avg_lenght += len(tokenizer.tokenize(answers_text[i][j]))
             av = avg_lenght/(len(answers_text[i]))
-            answer_lenght.append(av)
+            answer_length.append(av)
 
-        return answer_lenght
+        return answer_length
 
     
     def show_ents(self, doc): 
@@ -311,7 +311,7 @@ class ComputeHeuristics:
         self.data['distances'], self.data['closest_words'] = self.count_lowest_position_of_word_from_question_in_context()
         self.data['kth_sentence'] = self.identify_in_which_sentence_answer_is()
         self.data['cosine_similarity'] = self.compute_similarity_between_context_and_question()
-        self.data['answer_lenght'] = self.average_answer_length()
+        self.data['answer_length'] = self.average_answer_length()
         self.data['max_sim_ents'] = self.count_similar_NER_from_context_to_answer()
         self.data['answer_subject_positions'] = self.extract_answer_position_with_respect_to_subject()
 
@@ -324,8 +324,8 @@ class ComputeHeuristics:
             self.data['kth_sentence'] = self.identify_in_which_sentence_answer_is()
         elif heuristic_name == 'cosine_similarity':
             self.data['cosine_similarity'] = self.compute_similarity_between_context_and_question()
-        elif heuristic_name == 'answer_lenght':
-            self.data['answer_lenght'] = self.average_answer_length()
+        elif heuristic_name == 'answer_length':
+            self.data['answer_length'] = self.average_answer_length()
         elif heuristic_name == 'max_sim_ents':
             self.data['max_sim_ents'] = self.count_similar_NER_from_context_to_answer()
         elif heuristic_name == 'answer_subject_positions':

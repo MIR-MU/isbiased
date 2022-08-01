@@ -21,17 +21,15 @@ class BiasSignificanceMeasure:
     
     num_for_average_metrics = 1
     metric = load_metric("squad")
-    write_to_log_files = False 
 
 
-    def __init__(self, data, dataset, iterations = 100, sample_size = 800):
-        self.data = data
-        self.dataset = dataset
+    def __init__(self, data: Dataset, iterations = 100, sample_size = 800):
+        self.data = pd.DataFrame(data) 
         self.iterations = iterations
         self.sample_size = sample_size
     
 
-    def __compute_metrics_for_sample(self, sample):
+    def _compute_metrics_for_sample(self, sample):
         """Computation of metrics for dataset sample
         Computes exact match and F1 between predicted and ground truth answers
 
@@ -46,7 +44,7 @@ class BiasSignificanceMeasure:
         return self.metric.compute(predictions=formatted_predictions, references=references)
 
 
-    def __compute_metrics_for_bunch(self, data):
+    def _compute_metrics_for_bunch(self, data):
         """Sampling the dataset for specified number of iterations and computation of metrics for samples
 
         Args:
@@ -61,7 +59,7 @@ class BiasSignificanceMeasure:
         for i in tqdm(range(self.iterations)):
             df = data.sample(n=self.sample_size)
             sample = Dataset.from_pandas(df)
-            metrics1 = self.__compute_metrics_for_sample(sample)
+            metrics1 = self._compute_metrics_for_sample(sample)
             exact_list.append(metrics1['exact_match'])
             f1_list.append(metrics1['f1'])
         
@@ -71,7 +69,7 @@ class BiasSignificanceMeasure:
         return df
 
 
-    def __find_the_distance_between_intervals(self, lower_025, lower_975, higher_025, higher_975):
+    def _find_the_distance_between_intervals(self, lower_025, lower_975, higher_025, higher_975):
         """Detect if there is some interval overlap between the two intervals or if there is not
         If there is not an overlap, it computes the distance between 2.5% and 97.5% quantiles
 
@@ -95,7 +93,7 @@ class BiasSignificanceMeasure:
             return False, distance_between_intervals
     
 
-    def compute_metrics_average_split(self, heuristic, threshold):
+    def _compute_metrics_average_split(self, heuristic, threshold):
         """Function which calls the previous ones and provide dataset splits and logging into files
 
         Args:
@@ -133,7 +131,7 @@ class BiasSignificanceMeasure:
 
 
         for i in tqdm(range(self.num_for_average_metrics)):
-            df_lower = self.__compute_metrics_for_bunch(data_lower)
+            df_lower = self._compute_metrics_for_bunch(data_lower)
             lower_exact_match_quantile_025.append(df_lower['exact_match'].quantile(0.025))
             lower_exact_match_quantile_975.append(df_lower['exact_match'].quantile(0.975))
             lower_exact_match_mean.append(df_lower['exact_match'].mean())
@@ -142,7 +140,7 @@ class BiasSignificanceMeasure:
             lower_f1_mean.append(df_lower['f1'].mean())
 
             
-            df_higher = self.__compute_metrics_for_bunch(data_higher)
+            df_higher = self._compute_metrics_for_bunch(data_higher)
             higher_exact_match_quantile_025.append(df_higher['exact_match'].quantile(0.025))
             higher_exact_match_quantile_975.append(df_higher['exact_match'].quantile(0.975))
             higher_exact_match_mean.append(df_higher['exact_match'].mean())
@@ -151,8 +149,8 @@ class BiasSignificanceMeasure:
             higher_f1_mean.append(df_higher['f1'].mean())
 
            
-        is_not_overlap_em, distance_em = self.__find_the_distance_between_intervals(mean(lower_exact_match_quantile_025), mean(lower_exact_match_quantile_975), mean(higher_exact_match_quantile_025), mean(higher_exact_match_quantile_975))
-        is_not_overlap_f1, distance_f1 = self.__find_the_distance_between_intervals(mean(lower_f1_quantile_025), mean(lower_f1_quantile_975), mean(higher_f1_quantile_025), mean(higher_f1_quantile_975))
+        is_not_overlap_em, distance_em = self._find_the_distance_between_intervals(mean(lower_exact_match_quantile_025), mean(lower_exact_match_quantile_975), mean(higher_exact_match_quantile_025), mean(higher_exact_match_quantile_975))
+        is_not_overlap_f1, distance_f1 = self._find_the_distance_between_intervals(mean(lower_f1_quantile_025), mean(lower_f1_quantile_975), mean(higher_f1_quantile_025), mean(higher_f1_quantile_975))
 
 
         # print(f"Average exact match with params: samples {self.sample_size} iters {self.iterations} ---- are independent: {is_not_overlap_em} the distance is: {distance_em}")
@@ -162,24 +160,21 @@ class BiasSignificanceMeasure:
         return [distance_em, distance_f1, len(data_lower), len(data_higher), mean(lower_exact_match_quantile_975), mean(higher_exact_match_quantile_975)]
     
 
-    def find_best_threshold_for_heuristic(self, distances_dictionary: dict):
+    def _find_best_threshold_for_heuristic(self, distances_dictionary: dict):
         best_threshold = 0
         max_distance = -1
         size_of_smaller = 0
-        times_4 = 0
 
         for key, value in zip(distances_dictionary.keys(), distances_dictionary.values()):
-            if (value[0] > max_distance and max_distance == -1)  or (max_distance != -1 and (value[0] > max_distance or (value[0] > 0 and size_of_smaller < self.sample_size*2)) and value[2] > self.sample_size*2 and value[3] > self.sample_size*2): # and value[0] > times_4 * 2): #or (max_distance != -1 and value[0] > max_distance and value[2] > self.sample_size*4 and value[3] > self.sample_size*4)
+            if (value[0] > max_distance and max_distance == -1)  or (max_distance != -1 and (value[0] > max_distance or (value[0] > 0 and size_of_smaller < self.sample_size*2)) and value[2] > self.sample_size*2 and value[3] > self.sample_size*2):
                 max_distance = value[0]
                 best_threshold = key
                 size_of_smaller = value[2] if value[2] < value[3] else value[3]
-                if size_of_smaller > self.sample_size*4:
-                    times_4 = max_distance
         
-        return best_threshold
+        return best_threshold, max_distance, distances_dictionary
 
 
-    def find_longest_distance(self, heuristic):
+    def find_longest_distance(self, heuristic: str):
         """Finds out the longest distance between intervals for bunch of thresholds
 
         Args:
@@ -202,8 +197,8 @@ class BiasSignificanceMeasure:
         # print(f"Min value: {min_value_for_threshold} and max value: {max_value_for_threshold}")
 
         while(min_value_for_threshold < max_value_for_threshold):
-            # distance_em, distance_f1 = self.compute_metrics_average_split(heuristic, min_value_for_threshold)
-            distances_dict[min_value_for_threshold] = self.compute_metrics_average_split(heuristic, min_value_for_threshold)
+            # distance_em, distance_f1 = self._compute_metrics_average_split(heuristic, min_value_for_threshold)
+            distances_dict[min_value_for_threshold] = self._compute_metrics_average_split(heuristic, min_value_for_threshold)
             if distance_em > max_em_distance:
                 # max_em_distance = distance_em
                 max_em_distance = distances_dict.get(min_value_for_threshold)[0]
@@ -223,7 +218,7 @@ class BiasSignificanceMeasure:
         # print(f"The biggest distance between exact match intervals was with threshold {index_em} and the distance was {max_em_distance}.")
         # print(f"The biggest distance between f1 intervals was with threshold {index_f1} and the distance was {max_f1_distance}.")
 
-        return distances_dict
+        return self._find_best_threshold_for_heuristic(distances_dict)
 
 
     def evaluate_model_on_dataset(self, model_path:str, dataset_eval: Dataset):
@@ -425,19 +420,29 @@ class BiasSignificanceMeasure:
 
 
     def compute_heuristics(self):
-        train_dataset = pd.read_json('./datasets/squad_train.json')
+        # train_dataset = pd.read_json('./datasets/squad_train.json')
+        train_dataset = pd.DataFrame(load_dataset("squad")['train'])
 
         squad_with_heuristics = ComputeHeuristics(self.data, train_dataset)
         squad_with_heuristics.compute_all_heuristics()
         self.data = squad_with_heuristics.data
+
     
-    def split_data_by_heuristics(self, dataset: pd.DataFrame, heuristic: str):
-        dist_dict = self.find_longest_distance(heuristic)
-        best_threshold = self.find_best_threshold_for_heuristic(dist_dict)
+    def compute_heuristic(self, heuristic: str):
+        train_dataset = pd.DataFrame(load_dataset("squad")['train'])
+
+        computed_heuristic = ComputeHeuristics(self.data, train_dataset)
+        computed_heuristic.compute_heuristic(heuristic)
+        self.data = computed_heuristic.data
+
+
+    
+    def split_data_by_heuristics(self, dataset: Dataset, heuristic: str):
+        best_threshold, distance, dist_dict = self.find_longest_distance(heuristic)
         print(best_threshold)
 
         if best_threshold != -1:
-            comp_heuristic = ComputeHeuristics(dataset, dataset)
+            comp_heuristic = ComputeHeuristics(pd.DataFrame(dataset), pd.DataFrame(dataset))
             comp_heuristic.compute_heuristic(heuristic)
             dataset = comp_heuristic.data
 
@@ -446,4 +451,4 @@ class BiasSignificanceMeasure:
             else:
                 biasedDataset, unbiasedDataset = [x for _, x in dataset.groupby(dataset[heuristic] <= best_threshold)]
 
-        return (biasedDataset, unbiasedDataset)
+        return (Dataset.from_pandas(biasedDataset), Dataset.from_pandas(unbiasedDataset))
