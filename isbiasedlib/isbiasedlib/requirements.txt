@@ -1,0 +1,16 @@
+datasets==2.2.1
+ipykernel
+ipython
+jupyter-client
+jupyter-core
+matplotlib-inline
+nltk
+numpy
+pandas==1.3.5
+scikit-learn
+scipy
+spacy
+torch==1.11.0
+torchaudio==0.11.0
+torchvision==0.12.0
+transformers==4.19.1
