@@ -169,7 +169,7 @@ class BiasSignificanceMeasure:
         times_4 = 0
 
         for key, value in zip(distances_dictionary.keys(), distances_dictionary.values()):
-            if (value[0] > max_distance and max_distance == -1)  or (max_distance != -1 and (value[0] > max_distance or size_of_smaller < self.sample_size*2) and value[2] > self.sample_size*2 and value[3] > self.sample_size*2): # and value[0] > times_4 * 2): #or (max_distance != -1 and value[0] > max_distance and value[2] > self.sample_size*4 and value[3] > self.sample_size*4)
+            if (value[0] > max_distance and max_distance == -1)  or (max_distance != -1 and (value[0] > max_distance or (value[0] > 0 and size_of_smaller < self.sample_size*2)) and value[2] > self.sample_size*2 and value[3] > self.sample_size*2): # and value[0] > times_4 * 2): #or (max_distance != -1 and value[0] > max_distance and value[2] > self.sample_size*4 and value[3] > self.sample_size*4)
                 max_distance = value[0]
                 best_threshold = key
                 size_of_smaller = value[2] if value[2] < value[3] else value[3]
