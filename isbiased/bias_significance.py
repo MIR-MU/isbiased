@@ -1,5 +1,5 @@
 
-from heuristics import *
+from .heuristics import *
 
 import json
 import transformers
@@ -24,6 +24,7 @@ class BiasSignificanceMeasure:
 
 
     def __init__(self, data: Dataset, iterations = 100, sample_size = 800):
+        # TODO: comment
         self.data = pd.DataFrame(data) 
         self.iterations = iterations
         self.sample_size = sample_size
