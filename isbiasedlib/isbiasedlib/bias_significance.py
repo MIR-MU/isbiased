@@ -112,7 +112,7 @@ class BiasSignificanceMeasure:
             data_higher, data_lower = [x for _, x in self.data.groupby(self.data[heuristic] <= threshold)]
 
         if len(data_higher) < self.sample_size or len(data_lower) < self.sample_size:
-            return -1, -1
+            return [-1, -1, 0, 0, 0, 0]
 
         lower_exact_match_quantile_025 = []
         lower_exact_match_quantile_975 = []
@@ -161,7 +161,7 @@ class BiasSignificanceMeasure:
     
 
     def _find_best_threshold_for_heuristic(self, distances_dictionary: dict):
-        best_threshold = 0
+        best_threshold = -1
         max_distance = -1
         size_of_smaller = 0
 
@@ -439,7 +439,9 @@ class BiasSignificanceMeasure:
     
     def split_data_by_heuristics(self, dataset: Dataset, heuristic: str):
         best_threshold, distance, dist_dict = self.find_longest_distance(heuristic)
-        print(best_threshold)
+        # print(best_threshold)
+        # print(distance)
+        # print(dist_dict)
 
         if best_threshold != -1:
             comp_heuristic = ComputeHeuristics(pd.DataFrame(dataset), pd.DataFrame(dataset))
@@ -450,5 +452,9 @@ class BiasSignificanceMeasure:
                 unbiasedDataset, biasedDataset = [x for _, x in dataset.groupby(dataset[heuristic] <= best_threshold)]
             else:
                 biasedDataset, unbiasedDataset = [x for _, x in dataset.groupby(dataset[heuristic] <= best_threshold)]
+        
+        else:
+            print('Dataset was not split!!!')
+            return (dataset, dataset)
 
         return (Dataset.from_pandas(biasedDataset), Dataset.from_pandas(unbiasedDataset))
