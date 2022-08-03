@@ -71,7 +71,6 @@ def main():
                              "E.g., 0.1 = 10%% of training.")
     parser.add_argument("--no_cuda",
                         default=False,
-                        action='store_true',
                         help="Whether not to use CUDA when available")
     parser.add_argument("--local_rank",
                         type=int,
@@ -98,7 +97,7 @@ def main():
 
     dataset = load_dataset("squad")
     tokenized_squad = dataset.map(prepare_train_features, batched=True, remove_columns=dataset["train"].column_names,
-                                  fn_kwargs={'tokenizer': tokenizer})
+                                  fn_kwargs={'tokenizer': tokenizer, 'args':args})
     print("Got dataset...")
     data_collator = DefaultDataCollator()
 
