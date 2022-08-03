@@ -1,35 +1,33 @@
-
-from heuristics import *
-
-import json
-import transformers
-from transformers import AutoModelForQuestionAnswering, TrainingArguments, Trainer
-from transformers import AutoTokenizer
-from transformers import EarlyStoppingCallback
-from transformers import default_data_collator
-from datasets import load_dataset, load_metric
 import collections
+from statistics import mean
+from typing import Dict
+
 import numpy as np
 import pandas as pd
 from datasets import Dataset
-from datasets import ClassLabel, Sequence
+from datasets import load_dataset, load_metric
 from tqdm.auto import tqdm
-import os
-from statistics import mean
+from transformers import AutoModelForQuestionAnswering, Trainer
+from transformers import AutoTokenizer
+from transformers import default_data_collator
+
+from .heuristics import *
+
 
 class BiasSignificanceMeasure:
-    
     num_for_average_metrics = 1
     metric = load_metric("squad")
 
-
-    def __init__(self, data: Dataset, iterations = 100, sample_size = 800):
-        self.data = pd.DataFrame(data) 
+    def __init__(self, data: Dataset, iterations=100, sample_size=800):
+        # TODO: comment
+        # TODO: types of all input parameters
+        self.data = pd.DataFrame(data)
         self.iterations = iterations
         self.sample_size = sample_size
-    
 
-    def _compute_metrics_for_sample(self, sample):
+    def _compute_metrics_for_sample(self, sample) -> Dict[str, float]:
+        # TODO: see the return type annotation ^^ and use it for all public methods
+        # TODO: types of all input parameters
         """Computation of metrics for dataset sample
         Computes exact match and F1 between predicted and ground truth answers
 
@@ -39,12 +37,13 @@ class BiasSignificanceMeasure:
         Returns:
             dict: computed metrics
         """
-        formatted_predictions = [{"id": k, "prediction_text": v} for k, v in zip(sample['id'], sample['prediction_text'])]
+        formatted_predictions = [{"id": k, "prediction_text": v} for k, v in
+                                 zip(sample['id'], sample['prediction_text'])]
         references = [{"id": ex["id"], "answers": ex["answers"]} for ex in sample]
         return self.metric.compute(predictions=formatted_predictions, references=references)
 
-
     def _compute_metrics_for_bunch(self, data):
+        # TODO: types of all input parameters
         """Sampling the dataset for specified number of iterations and computation of metrics for samples
 
         Args:
@@ -62,14 +61,14 @@ class BiasSignificanceMeasure:
             metrics1 = self._compute_metrics_for_sample(sample)
             exact_list.append(metrics1['exact_match'])
             f1_list.append(metrics1['f1'])
-        
+
         d = {'exact_match': exact_list, 'f1': f1_list}
         df = pd.DataFrame(d)
 
         return df
 
-
     def _find_the_distance_between_intervals(self, lower_025, lower_975, higher_025, higher_975):
+        # TODO: types of all input parameters
         """Detect if there is some interval overlap between the two intervals or if there is not
         If there is not an overlap, it computes the distance between 2.5% and 97.5% quantiles
 
@@ -85,15 +84,15 @@ class BiasSignificanceMeasure:
         distance_between_intervals = 0
         if lower_975 > higher_025 and lower_025 > higher_975:
             distance_between_intervals = lower_025 - higher_975
-            return True, distance_between_intervals 
+            return True, distance_between_intervals
         elif higher_975 > lower_025 and higher_025 > lower_975:
             distance_between_intervals = higher_025 - lower_975
             return True, distance_between_intervals
         else:
             return False, distance_between_intervals
-    
 
     def _compute_metrics_average_split(self, heuristic, threshold):
+        # TODO: types of all input parameters
         """Function which calls the previous ones and provide dataset splits and logging into files
 
         Args:
@@ -105,10 +104,12 @@ class BiasSignificanceMeasure:
         """
 
         if heuristic == 'distances':
-            data_higher, data_lower = [x for _, x in self.data[self.data.distances >= 0].groupby(self.data[heuristic] <= threshold)]
+            data_higher, data_lower = [x for _, x in
+                                       self.data[self.data.distances >= 0].groupby(self.data[heuristic] <= threshold)]
         elif heuristic == 'answer_subject_positions':
-            data_higher, data_lower = [x for _, x in self.data[self.data.answer_subject_positions >= 0].groupby(self.data[heuristic] <= threshold)]
-        else:            
+            data_higher, data_lower = [x for _, x in self.data[self.data.answer_subject_positions >= 0].groupby(
+                self.data[heuristic] <= threshold)]
+        else:
             data_higher, data_lower = [x for _, x in self.data.groupby(self.data[heuristic] <= threshold)]
 
         if len(data_higher) < self.sample_size or len(data_lower) < self.sample_size:
@@ -129,7 +130,6 @@ class BiasSignificanceMeasure:
         df_lower = []
         df_higher = []
 
-
         for i in tqdm(range(self.num_for_average_metrics)):
             df_lower = self._compute_metrics_for_bunch(data_lower)
             lower_exact_match_quantile_025.append(df_lower['exact_match'].quantile(0.025))
@@ -139,7 +139,6 @@ class BiasSignificanceMeasure:
             lower_f1_quantile_975.append(df_lower['f1'].quantile(0.975))
             lower_f1_mean.append(df_lower['f1'].mean())
 
-            
             df_higher = self._compute_metrics_for_bunch(data_higher)
             higher_exact_match_quantile_025.append(df_higher['exact_match'].quantile(0.025))
             higher_exact_match_quantile_975.append(df_higher['exact_match'].quantile(0.975))
@@ -148,39 +147,50 @@ class BiasSignificanceMeasure:
             higher_f1_quantile_975.append(df_higher['f1'].quantile(0.975))
             higher_f1_mean.append(df_higher['f1'].mean())
 
-           
-        is_not_overlap_em, distance_em = self._find_the_distance_between_intervals(mean(lower_exact_match_quantile_025), mean(lower_exact_match_quantile_975), mean(higher_exact_match_quantile_025), mean(higher_exact_match_quantile_975))
-        is_not_overlap_f1, distance_f1 = self._find_the_distance_between_intervals(mean(lower_f1_quantile_025), mean(lower_f1_quantile_975), mean(higher_f1_quantile_025), mean(higher_f1_quantile_975))
-
+        is_not_overlap_em, distance_em = self._find_the_distance_between_intervals(mean(lower_exact_match_quantile_025),
+                                                                                   mean(lower_exact_match_quantile_975),
+                                                                                   mean(
+                                                                                       higher_exact_match_quantile_025),
+                                                                                   mean(
+                                                                                       higher_exact_match_quantile_975))
+        is_not_overlap_f1, distance_f1 = self._find_the_distance_between_intervals(mean(lower_f1_quantile_025),
+                                                                                   mean(lower_f1_quantile_975),
+                                                                                   mean(higher_f1_quantile_025),
+                                                                                   mean(higher_f1_quantile_975))
 
         # print(f"Average exact match with params: samples {self.sample_size} iters {self.iterations} ---- are independent: {is_not_overlap_em} the distance is: {distance_em}")
 
         # print(f"Average f1 with params: samples {self.sample_size} iters {self.iterations} ---- are independent: {is_not_overlap_f1} the distance is: {distance_f1}")
 
-        return [distance_em, distance_f1, len(data_lower), len(data_higher), mean(lower_exact_match_quantile_975), mean(higher_exact_match_quantile_975)]
-    
+        return [distance_em, distance_f1, len(data_lower), len(data_higher), mean(lower_exact_match_quantile_975),
+                mean(higher_exact_match_quantile_975)]
 
     def _find_best_threshold_for_heuristic(self, distances_dictionary: dict):
+        # TODO: types of all input parameters: should be Dict[key_type, value_type]
         best_threshold = -1
         max_distance = -1
         size_of_smaller = 0
 
         for key, value in zip(distances_dictionary.keys(), distances_dictionary.values()):
-            if (value[0] > max_distance and max_distance == -1)  or (max_distance != -1 and (value[0] > max_distance or (value[0] > 0 and size_of_smaller < self.sample_size*2)) and value[2] > self.sample_size*2 and value[3] > self.sample_size*2):
+            if (value[0] > max_distance and max_distance == -1) or (max_distance != -1 and (
+                    value[0] > max_distance or (value[0] > 0 and size_of_smaller < self.sample_size * 2)) and value[
+                                                                        2] > self.sample_size * 2 and value[
+                                                                        3] > self.sample_size * 2):
                 max_distance = value[0]
                 best_threshold = key
                 size_of_smaller = value[2] if value[2] < value[3] else value[3]
-        
-        return best_threshold, max_distance, distances_dictionary
 
+        return best_threshold, max_distance, distances_dictionary
 
     def find_longest_distance(self, heuristic: str):
         """Finds out the longest distance between intervals for bunch of thresholds
 
         Args:
             heuristic (str): Dataframe column
+        TODO: these are not the args of this method:
             low_bound (int): the number from which the threshold will start from
             upp_bound (int): the number for which the threshold will go -1
+
         """
         index_em = 0
         index_f1 = 0
@@ -196,9 +206,10 @@ class BiasSignificanceMeasure:
 
         # print(f"Min value: {min_value_for_threshold} and max value: {max_value_for_threshold}")
 
-        while(min_value_for_threshold < max_value_for_threshold):
+        while (min_value_for_threshold < max_value_for_threshold):
             # distance_em, distance_f1 = self._compute_metrics_average_split(heuristic, min_value_for_threshold)
-            distances_dict[min_value_for_threshold] = self._compute_metrics_average_split(heuristic, min_value_for_threshold)
+            distances_dict[min_value_for_threshold] = self._compute_metrics_average_split(heuristic,
+                                                                                          min_value_for_threshold)
             if distance_em > max_em_distance:
                 # max_em_distance = distance_em
                 max_em_distance = distances_dict.get(min_value_for_threshold)[0]
@@ -220,8 +231,10 @@ class BiasSignificanceMeasure:
 
         return self._find_best_threshold_for_heuristic(distances_dict)
 
-
-    def evaluate_model_on_dataset(self, model_path:str, dataset_eval: Dataset):
+    def evaluate_model_on_dataset(self, model_path: str, dataset_eval: Dataset):
+        # TODO: docs
+        # TODO: parameter types
+        # TODO: return type annotation
         squad_v2 = False
         model_checkpoint = "roberta-large"
         m_name = model_path.split("/")[-1]
@@ -248,14 +261,18 @@ class BiasSignificanceMeasure:
         # Preprocessing function for validation dataset from the HuggingFace Jupyter notebook
         # with original comments
         def prepare_validation_features(examples):
+            # TODO: docs
+            # TODO: parameter types
+            # TODO: return type annotation
+
             # Some of the questions have lots of whitespace on the left, which is not useful and will make the
             # truncation of the context fail (the tokenized question will take a lots of space). So we remove that
             # left whitespace
             examples["question"] = [q.lstrip() for q in examples["question"]]
 
-            # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
-            # in one example possible giving several features when a context is long, each of those features having a
-            # context that overlaps a bit the context of the previous feature.
+            # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This
+            # results in one example possible giving several features when a context is long, each of those features
+            # having a context that overlaps a bit the context of the previous feature.
             tokenized_examples = tokenizer(
                 examples["question" if pad_on_right else "context"],
                 examples["context" if pad_on_right else "question"],
@@ -275,7 +292,8 @@ class BiasSignificanceMeasure:
             tokenized_examples["example_id"] = []
 
             for i in range(len(tokenized_examples["input_ids"])):
-                # Grab the sequence corresponding to that example (to know what is the context and what is the question).
+                # Grab the sequence corresponding to that example
+                # (to know what is the context and what is the question).
                 sequence_ids = tokenized_examples.sequence_ids(i)
                 context_index = 1 if pad_on_right else 0
 
@@ -294,7 +312,11 @@ class BiasSignificanceMeasure:
 
         # Postprocessing function from the HuggingFace Jupyter notebook
         # with original comments
-        def postprocess_qa_predictions(examples, features, raw_predictions, n_best_size = 20, max_answer_length = 30):
+        def postprocess_qa_predictions(examples, features, raw_predictions, n_best_size=20, max_answer_length=30):
+            # TODO: docs
+            # TODO: parameter types
+            # TODO: return type annotation
+
             all_start_logits, all_end_logits = raw_predictions
             # Build a map example to its corresponding features.
             example_id_to_index = {k: i for i, k in enumerate(examples["id"])}
@@ -313,17 +335,17 @@ class BiasSignificanceMeasure:
                 # Those are the indices of the features associated to the current example.
                 feature_indices = features_per_example[example_index]
 
-                min_null_score = None # Only used if squad_v2 is True.
+                min_null_score = None  # Only used if squad_v2 is True.
                 valid_answers = []
-                
+
                 context = example["context"]
                 # Looping through all the features associated to the current example.
                 for feature_index in feature_indices:
                     # We grab the predictions of the model for this feature.
                     start_logits = all_start_logits[feature_index]
                     end_logits = all_end_logits[feature_index]
-                    # This is what will allow us to map some the positions in our logits to span of texts in the original
-                    # context.
+                    # This is what will allow us to map some the positions in our logits to span of texts in the
+                    # original context.
                     offset_mapping = features[feature_index]["offset_mapping"]
 
                     # Update minimum null prediction.
@@ -333,26 +355,26 @@ class BiasSignificanceMeasure:
                         min_null_score = feature_null_score
 
                     # Go through all possibilities for the `n_best_size` greater start and end logits.
-                    start_indexes = np.argsort(start_logits)[-1 : -n_best_size - 1 : -1].tolist()
-                    end_indexes = np.argsort(end_logits)[-1 : -n_best_size - 1 : -1].tolist()
-                    
+                    start_indexes = np.argsort(start_logits)[-1: -n_best_size - 1: -1].tolist()
+                    end_indexes = np.argsort(end_logits)[-1: -n_best_size - 1: -1].tolist()
+
                     for start_index in start_indexes:
                         for end_index in end_indexes:
-                            # Don't consider out-of-scope answers, either because the indices are out of bounds or correspond
-                            # to part of the input_ids that are not in the context.
+                            # Don't consider out-of-scope answers, either because the indices are out of bounds or
+                            # correspond to part of the input_ids that are not in the context.
                             if (
-                                start_index >= len(offset_mapping)
-                                or end_index >= len(offset_mapping)
-                                or offset_mapping[start_index] is None
-                                or offset_mapping[end_index] is None
+                                    start_index >= len(offset_mapping)
+                                    or end_index >= len(offset_mapping)
+                                    or offset_mapping[start_index] is None
+                                    or offset_mapping[end_index] is None
                             ):
                                 continue
                             # Don't consider answers with a length that is either < 0 or > max_answer_length.
                             if end_index < start_index or end_index - start_index + 1 > max_answer_length:
                                 continue
-                            if len(offset_mapping[start_index]) == 0 or len(offset_mapping[end_index]) == 0: 
+                            if len(offset_mapping[start_index]) == 0 or len(offset_mapping[end_index]) == 0:
                                 continue
-                                                
+
                             start_char = offset_mapping[start_index][0]
                             end_char = offset_mapping[end_index][1]
                             valid_answers.append(
@@ -361,14 +383,14 @@ class BiasSignificanceMeasure:
                                     "text": context[start_char: end_char]
                                 }
                             )
-                
+
                 if len(valid_answers) > 0:
                     best_answer = sorted(valid_answers, key=lambda x: x["score"], reverse=True)[0]
                 else:
                     # In the very rare edge case we have not a single non-null prediction, we create a fake prediction to avoid
                     # failure.
                     best_answer = {"text": "", "score": 0.0}
-                
+
                 # Let's pick our final answer: the best one or the null answer (only for squad_v2)
                 if not squad_v2:
                     predictions[example["id"]] = best_answer["text"]
@@ -378,12 +400,15 @@ class BiasSignificanceMeasure:
 
             return predictions
 
-        
-        def model_evaluation_on_dataset(dataset_eval, save_dataframe_with_predictions = False, name = 'model_name'):
+        def model_evaluation_on_dataset(dataset_eval, save_dataframe_with_predictions=False, name='model_name'):
+            # TODO: parameter types
+            # TODO: return type annotation
+
             """Model evaluation on specific dataset
             Calls previous functions and evaluate the dataset on the model for exact match and F1
 
             Args:
+                # TODO: not the method arg:
                 dataset (Dataset): validation dataset
                 save_dataframe_with_predictions (bool, optional): flag for saving the dataset with prediction. Defaults to False.
                 name (str, optional): name of the model. Defaults to 'model_name'.
@@ -398,28 +423,34 @@ class BiasSignificanceMeasure:
             )
 
             raw_predictions = trainer.predict(validation_features)
-            
-            validation_features.set_format(type=validation_features.format["type"], columns=list(validation_features.features.keys()))
 
-            final_predictions = postprocess_qa_predictions(dataset_eval, validation_features, raw_predictions.predictions)
+            validation_features.set_format(type=validation_features.format["type"],
+                                           columns=list(validation_features.features.keys()))
+
+            final_predictions = postprocess_qa_predictions(dataset_eval, validation_features,
+                                                           raw_predictions.predictions)
 
             predictions = [v for k, v in final_predictions.items()]
             formatted_predictions = [{"id": k, "prediction_text": v} for k, v in final_predictions.items()]
             references = [{"id": ex["id"], "answers": ex["answers"]} for ex in dataset_eval]
-            
+
             if save_dataframe_with_predictions:
-                data = pd.DataFrame(dataset_eval)   
+                data = pd.DataFrame(dataset_eval)
                 data['prediction_text'] = predictions
                 data.to_json('./datasets/' + name + '.json', orient='records')
 
             return metric.compute(predictions=formatted_predictions, references=references), data
-        
-        metrics, self.data = model_evaluation_on_dataset(dataset_eval, save_dataframe_with_predictions = True, name = m_name)
-        
+
+        metrics, self.data = model_evaluation_on_dataset(dataset_eval,
+                                                         save_dataframe_with_predictions=True,
+                                                         name=m_name)
+
         return metrics
 
-
     def compute_heuristics(self):
+        # TODO: docs
+        # TODO: return type annotation
+
         # train_dataset = pd.read_json('./datasets/squad_train.json')
         train_dataset = pd.DataFrame(load_dataset("squad")['train'])
 
@@ -427,17 +458,19 @@ class BiasSignificanceMeasure:
         squad_with_heuristics.compute_all_heuristics()
         self.data = squad_with_heuristics.data
 
-    
     def compute_heuristic(self, heuristic: str):
+        # TODO: docs
+        # TODO: return type annotation
         train_dataset = pd.DataFrame(load_dataset("squad")['train'])
 
         computed_heuristic = ComputeHeuristics(self.data, train_dataset)
         computed_heuristic.compute_heuristic(heuristic)
         self.data = computed_heuristic.data
 
-
-    
     def split_data_by_heuristics(self, dataset: Dataset, heuristic: str):
+        # TODO: docs
+        # TODO: return type annotation
+
         best_threshold, distance, dist_dict = self.find_longest_distance(heuristic)
         # print(best_threshold)
         # print(distance)
@@ -452,9 +485,9 @@ class BiasSignificanceMeasure:
                 unbiasedDataset, biasedDataset = [x for _, x in dataset.groupby(dataset[heuristic] <= best_threshold)]
             else:
                 biasedDataset, unbiasedDataset = [x for _, x in dataset.groupby(dataset[heuristic] <= best_threshold)]
-        
+
         else:
             print('Dataset was not split!!!')
             return (dataset, dataset)
 
-        return (Dataset.from_pandas(biasedDataset), Dataset.from_pandas(unbiasedDataset))
+        return Dataset.from_pandas(biasedDataset), Dataset.from_pandas(unbiasedDataset)
