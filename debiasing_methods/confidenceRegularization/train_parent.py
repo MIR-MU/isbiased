@@ -2,7 +2,8 @@ import argparse
 import os
 
 from datasets import load_dataset
-from transformers import AutoTokenizer, AutoModelForQuestionAnswering, DefaultDataCollator, TrainingArguments, Trainer
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering, DefaultDataCollator, TrainingArguments, Trainer, \
+    EarlyStoppingCallback
 
 import torch
 
@@ -124,6 +125,7 @@ def main():
             eval_dataset=tokenized_squad["validation"],
             tokenizer=tokenizer,
             data_collator=data_collator,
+            callbacks=[EarlyStoppingCallback(early_stopping_patience=10)]
         )
 
         print("Starting training...")
