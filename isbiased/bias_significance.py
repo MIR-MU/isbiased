@@ -20,15 +20,13 @@ class BiasSignificanceMeasure:
     num_for_average_metrics = 1
     metric = load_metric("squad")
 
-    def __init__(self, data: Dataset, iterations: int = 100, sample_size: int = 800):
+    def __init__(self, iterations: int = 100, sample_size: int = 800):
         """Initialization of BiasSignificanceMeasure
 
         Args:
-            data (Dataset): _description_
             iterations (int, optional): number of iterations for bootstrapping bias significance measure. Defaults to 100.
             sample_size (int, optional): sample size for bootstrapping bias significance measure. Defaults to 800.
         """
-        self.data = pd.DataFrame(data)
         self.iterations = iterations
         self.sample_size = sample_size
 
@@ -94,10 +92,11 @@ class BiasSignificanceMeasure:
         else:
             return False, distance_between_intervals
 
-    def _compute_metrics_average_split(self, heuristic: str, threshold: float) -> List[float]:
-        """Function which calls the previous ones and provide dataset splits and logging into files
+    def _compute_metrics_average_split(self, dataset: pd.DataFrame, heuristic: str, threshold: float) -> List[float]:
+        """Function which calls the previous ones and provide dataset splits and computation of bias significance
 
         Args:
+            dataset (pd.DataFrame): dataset for evaluation
             heuristic (str): column of the dataset based on which we want to split the data
             threshold (float): number for the split of dataset, the values lower or equal will be in one subset and values higher than the threshold will be in the other
 
@@ -106,12 +105,12 @@ class BiasSignificanceMeasure:
         """
         if heuristic == 'distances':
             data_higher, data_lower = [x for _, x in
-                                       self.data[self.data.distances >= 0].groupby(self.data[heuristic] <= threshold)]
+                                       dataset[dataset.distances >= 0].groupby(dataset[heuristic] <= threshold)]
         elif heuristic == 'answer_subject_positions':
-            data_higher, data_lower = [x for _, x in self.data[self.data.answer_subject_positions >= 0].groupby(
-                self.data[heuristic] <= threshold)]
+            data_higher, data_lower = [x for _, x in dataset[dataset.answer_subject_positions >= 0].groupby(
+                dataset[heuristic] <= threshold)]
         else:
-            data_higher, data_lower = [x for _, x in self.data.groupby(self.data[heuristic] <= threshold)]
+            data_higher, data_lower = [x for _, x in dataset.groupby(dataset[heuristic] <= threshold)]
 
         if len(data_higher) < self.sample_size or len(data_lower) < self.sample_size:
             return [-1, -1, 0, 0, 0, 0]
@@ -190,14 +189,16 @@ class BiasSignificanceMeasure:
 
         return best_threshold, max_distance, distances_dictionary
 
-    def find_longest_distance(self, heuristic: str) -> Tuple[float, float, Dict[float, float]]: #TODO rename, something like evaluate_heuristic can be better
+    def find_longest_distance(self, dataset: Dataset, heuristic: str) -> Tuple[float, float, Dict[float, float], Dataset]: #TODO rename, something like evaluate_heuristic can be better
         """Finds out the longest distance between intervals for thresholds
 
+
         Args:
+            dataset (Dataset): dataset for evaluation
             heuristic (str): identicator of the heuristic
 
         Returns:
-            Tuple[float, float, Dict[float, float]]: best threshold, maximum distance (exact match) and the dictionary returned from the _find_best_threshold_for_heuristic() method
+            Tuple[float, float, Dict[float, float], Dataset]: best threshold, maximum distance (exact match) and the dictionary returned from the _find_best_threshold_for_heuristic() method, and dataset
         """
         index_em = 0
         index_f1 = 0
@@ -208,16 +209,18 @@ class BiasSignificanceMeasure:
         distance_em = 0
         distance_f1 = 0
 
-        self.data = self._compute_heuristic(heuristic)
+        dfdataset = pd.DataFrame(dataset)
 
-        min_value_for_threshold = int(self.data[heuristic].min()) + 1 if self.data[heuristic].min() > 0 else 0
-        max_value_for_threshold = self.data[heuristic].max()
+        dfdataset = self._compute_heuristic(dfdataset, heuristic)
+
+        min_value_for_threshold = int(dfdataset[heuristic].min()) + 1 if dfdataset[heuristic].min() > 0 else 0
+        max_value_for_threshold = dfdataset[heuristic].max()
 
         # print(f"Min value: {min_value_for_threshold} and max value: {max_value_for_threshold}")
 
         while (min_value_for_threshold < max_value_for_threshold):
             # distance_em, distance_f1 = self._compute_metrics_average_split(heuristic, min_value_for_threshold)
-            distances_dict[min_value_for_threshold] = self._compute_metrics_average_split(heuristic,
+            distances_dict[min_value_for_threshold] = self._compute_metrics_average_split(dfdataset, heuristic,
                                                                                           min_value_for_threshold)
             if distance_em > max_em_distance:
                 # max_em_distance = distance_em
@@ -238,9 +241,9 @@ class BiasSignificanceMeasure:
         # print(f"The biggest distance between exact match intervals was with threshold {index_em} and the distance was {max_em_distance}.")
         # print(f"The biggest distance between f1 intervals was with threshold {index_f1} and the distance was {max_f1_distance}.")
 
-        return self._find_best_threshold_for_heuristic(distances_dict)
+        return self._find_best_threshold_for_heuristic(distances_dict), Dataset.from_pandas(dfdataset)
 
-    def evaluate_model_on_dataset(self, model_path: str, dataset_eval: Dataset) -> Dict[str, float]:
+    def evaluate_model_on_dataset(self, model_path: str, dataset_eval: Dataset) -> Tuple[Dict[str, float], Dataset]:
         """Evaluation of fine-tuned model on selected dataset
 
         Args:
@@ -248,7 +251,7 @@ class BiasSignificanceMeasure:
             dataset_eval (Dataset): dataset for evaluation
 
         Returns:
-            Dict[str, float]: metrics for dataset - exact match and f1 score
+            Tuple[Dict[str, float], Dataset]: metrics for dataset - exact match and f1 score, and dataset
         """
         squad_v2 = False
         m_name = model_path.split("/")[-1]
@@ -425,7 +428,7 @@ class BiasSignificanceMeasure:
 
             return predictions
 
-        def model_evaluation_on_dataset(dataset_eval: Dataset, save_dataframe_with_predictions: bool = False, name: str = 'model_name') -> Tuple[Dict[str, float], pd.DataFrame]:
+        def model_evaluation_on_dataset(dataset_eval: Dataset, save_dataframe_with_predictions: bool = False, name: str = 'model_name') -> Tuple[Dict[str, float], Dataset]:
             """Model evaluation on specific dataset
             Calls previous functions and evaluate the dataset on the model for exact match and F1
 
@@ -435,7 +438,7 @@ class BiasSignificanceMeasure:
                 name (str, optional): name of the model.. Defaults to 'model_name'.
 
             Returns:
-                Tuple[Dict[str, float], pd.DataFrame]: dictionary of metrics and dataframe with predictions
+                Tuple[Dict[str, float], Dataset]: dictionary of metrics and dataset with predictions
             """
 
             validation_features = dataset_eval.map(
@@ -461,37 +464,50 @@ class BiasSignificanceMeasure:
                 data['prediction_text'] = predictions
                 # data.to_json('./datasets/' + name + '.json', orient='records')
 
-            return metric.compute(predictions=formatted_predictions, references=references), data
+            return metric.compute(predictions=formatted_predictions, references=references), Dataset.from_pandas(data)
 
-        metrics, self.data = model_evaluation_on_dataset(dataset_eval,
+        metrics, dataset = model_evaluation_on_dataset(dataset_eval,
                                                          save_dataframe_with_predictions=True,
                                                          name=m_name)
 
-        return metrics
+        return metrics, dataset
 
-    def compute_heuristics(self):
+    def compute_heuristics(self, dataset: Dataset) -> Dataset:
         """Computes all heuristics for the dataset
+
+        Args:
+            dataset (Dataset): dataset for computation of heuristics
+
+        Returns:
+            Dataset: dataset with computed heuristics
         """
         # train_dataset = pd.read_json('./datasets/squad_train.json')
         train_dataset = pd.DataFrame(load_dataset("squad")['train'])
+        dfdataset = pd.DataFrame(dataset)
 
-        squad_with_heuristics = ComputeHeuristics(self.data, train_dataset)
+        squad_with_heuristics = ComputeHeuristics(dfdataset, train_dataset)
         squad_with_heuristics.compute_all_heuristics()
-        self.data = squad_with_heuristics.data
+        dfdataset = squad_with_heuristics.data
 
-    def _compute_heuristic(self, heuristic: str) -> pd.DataFrame:
+        return Dataset.from_pandas(dfdataset)
+
+    def _compute_heuristic(self, dataset: pd.DataFrame, heuristic: str) -> pd.DataFrame:
         """Computes specific heuristic for the dataset
 
         Args:
+            dataset (pd.DataFrame): dataset for computation of heuristic
             heuristic (str): identificator of the heuristic
+
+        Returns:
+            pd.DataFrame: dataframe with computed heuristic
         """
         train_dataset = pd.DataFrame(load_dataset("squad")['train'])
 
-        computed_heuristic = ComputeHeuristics(self.data, train_dataset)
+        computed_heuristic = ComputeHeuristics(dataset, train_dataset)
         computed_heuristic.compute_heuristic(heuristic)
         return computed_heuristic.data
 
-    def split_data_by_heuristics(self, dataset: Dataset, heuristic: str) -> Tuple[Dataset, Dataset]:
+    def split_data_by_heuristics(self, dataset_for_evaluation: Dataset, dataset_for_split: Dataset, heuristic: str) -> Tuple[Dataset, Dataset]:
         """Splits dataset based on selected heuristics and it's best threshold
         into biased and unbiased subsets
 
@@ -502,13 +518,14 @@ class BiasSignificanceMeasure:
         Returns:
             Tuple[Dataset, Dataset]: biased subset and unbiased subset of the dataset, if the dataset is not split, it returns the original dataset
         """
-        best_threshold, distance, dist_dict = self.find_longest_distance(heuristic)
+        threshold_distance_dictionary, ds = self.find_longest_distance(dataset_for_evaluation, heuristic)
+        best_threshold, distance, dist_dict = threshold_distance_dictionary
         # print(best_threshold)
         # print(distance)
         # print(dist_dict)
 
         if best_threshold != -1:
-            comp_heuristic = ComputeHeuristics(pd.DataFrame(dataset), pd.DataFrame(load_dataset("squad")['train']))
+            comp_heuristic = ComputeHeuristics(pd.DataFrame(dataset_for_split), pd.DataFrame(load_dataset("squad")['train']))
             comp_heuristic.compute_heuristic(heuristic)
             dataset = comp_heuristic.data
 
