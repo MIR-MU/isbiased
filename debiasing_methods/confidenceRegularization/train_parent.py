@@ -8,7 +8,7 @@ import torch
 
 import pandas as pd
 
-from confidenceRegularization.utils import prepare_train_features
+from debiasing_methods.confidenceRegularization.utils import prepare_train_features
 
 
 def main():
@@ -157,7 +157,7 @@ def main():
     data = pd.DataFrame()
     data['start_logits'] = pd.Series(predictions[0].tolist())
     data['end_logits'] = pd.Series(predictions[1].tolist())
-    predictions_path = os.path.join(args.preds_dir,"teacher_preds" + "_" + os.path.basename(model))
+    predictions_path = os.path.join(args.preds_dir,"teacher_preds" + "_" + os.path.basename(model.name_or_path))
     data.to_json(predictions_path)
 
     print(f"Knowledge distillation completed! 👌 \n"
