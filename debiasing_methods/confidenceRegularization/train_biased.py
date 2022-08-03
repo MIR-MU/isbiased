@@ -2,8 +2,9 @@ import argparse
 import os
 import pickle
 
-from datasets import load_dataset, Dataset
-from transformers import AutoTokenizer, AutoModelForQuestionAnswering, DefaultDataCollator, TrainingArguments, Trainer
+from datasets import load_dataset, Dataset, load_from_disk
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering, DefaultDataCollator, TrainingArguments, Trainer, \
+    EarlyStoppingCallback
 
 import torch
 
@@ -13,24 +14,31 @@ from debiasing_methods.confidenceRegularization.utils import prepare_train_featu
 
 from isbiased.bias_significance import BiasSignificanceMeasure
 
+dirname = os.getcwd()
+
+
 def is_saved(teacher_model:str, args):
-    filename = "_".join([args.dataset,os.path.basename(teacher_model),args.bias])
-    path = os.path.join("./dataset/",filename)
-    return os.path.exists(path)
+    for name in ['easy', 'hard']:
+        filename = "_".join([args.dataset,os.path.basename(teacher_model),args.bias,name])
+        path = os.path.join(dirname, "dataset",filename)
+        if not os.path.isdir(path):
+            return False
+    return True
 
 
 def save_for_later(dataset, teacher_model:str, is_biased:str, args):
     is_biased_name = 'easy' if is_biased else 'hard'
     filename = "_".join([args.dataset, os.path.basename(teacher_model), args.bias, is_biased_name])
-    path = os.path.join("./dataset/", filename)
+    path = os.path.join(dirname, "dataset",filename)
     dataset.save_to_disk(path)
 
 
 def load_saved_split(teacher_model:str, is_biased: bool, args):
     is_biased_name = 'easy' if is_biased else 'hard'
     filename = "_".join([args.dataset, os.path.basename(teacher_model), args.bias, is_biased_name])
-    path = os.path.join("./dataset/", filename)
-    return load_dataset(path)
+    path = os.path.join(dirname, "dataset",filename)
+    return load_from_disk(path)
+
 
 
 def main():
@@ -139,8 +147,8 @@ def main():
 
     if not is_saved(teacher_model, args):
         # measurer = BiasSignificanceMeasure(squad_en['train'].select(range(2000)))
-        measurer = BiasSignificanceMeasure(squad_en['train'].train_test_split(train_size=100)['train'])
-        measurer.evaluate_model_on_dataset(teacher_model, squad_en['train'].train_test_split(train_size=100)['train'])
+        measurer = BiasSignificanceMeasure(squad_en['train'])
+        measurer.evaluate_model_on_dataset(teacher_model, squad_en['train'])
         measurer.compute_heuristic(args.bias)
         biasedDataset, unbiasedDataset = measurer.split_data_by_heuristics(squad_en['train'], args.bias)
 
@@ -151,7 +159,7 @@ def main():
     # unbiasedDataset = load_saved_split(teacher_model, False, args)
 
 
-    tokenized_dataset = biasedDataset.map(prepare_train_features, batched=True, remove_columns=biasedDataset["train"].column_names,
+    tokenized_dataset = biasedDataset.map(prepare_train_features, batched=True, remove_columns=biasedDataset.column_names,
                                   fn_kwargs={'tokenizer': biased_tokenizer, 'args':args})
     print("Got dataset...")
     data_collator = DefaultDataCollator()
@@ -163,13 +171,13 @@ def main():
             evaluation_strategy="no",  # for testing
             learning_rate=args.learning_rate,
             per_device_train_batch_size=args.train_batch_size,
-            gradient_accumulation_steps=args.gradien_accumulation_steps,
+            gradient_accumulation_steps=args.gradient_accumulation_steps,
             per_device_eval_batch_size=args.train_batch_size,
             max_steps=2,  # for testing
             num_train_epochs=args.num_train_epochs,
             warmup_ratio=args.warmup_proportion,
             weight_decay=0.01,
-            disable_tqdm=True
+            disable_tqdm=False
         )
 
         trainer = Trainer(
@@ -179,6 +187,7 @@ def main():
             eval_dataset=tokenized_dataset["validation"],
             tokenizer=biased_tokenizer,
             data_collator=data_collator,
+            callbacks=[EarlyStoppingCallback(early_stopping_patience=10)]
         )
 
         print("Starting training...")
