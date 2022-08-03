@@ -1,6 +1,7 @@
 from adaptor.adapter import Adapter
 from adaptor.evaluators.question_answering import F1ScoreForQA
 from adaptor.lang_module import LangModule
+from adaptor.objectives.question_answering import ExtractiveQA
 from adaptor.schedules import ParallelSchedule
 from adaptor.utils import AdaptationArguments, StoppingStrategy
 from datasets import load_dataset
@@ -10,7 +11,7 @@ from isbiased.bias_significance import BiasSignificanceMeasure
 
 # parameters
 biased_model_path = "bert-base-multilingual-cased"
-full_dataset_model_path = "../../models/electra-base-discriminator-finetuned-squad_with_callbacks_baseline"
+full_dataset_model_path = "../models/electra-base-discriminator-finetuned-squad_with_callbacks_baseline"
 
 num_val_samples = 200
 # end parameters
@@ -38,26 +39,25 @@ val_metrics = [F1ScoreForQA(decides_convergence=True)]
 squad_en = load_dataset("squad")
 
 bias_id = "distances"
-measurer = BiasSignificanceMeasure(squad_en['train'])
+measurer = BiasSignificanceMeasure(squad_en['train'].select(range(2000)))
 # we need already-trained model for this
-measurer.evaluate_model_on_dataset(full_dataset_model_path, squad_en['validation'])
+measurer.evaluate_model_on_dataset(full_dataset_model_path, squad_en['validation'].select(range(2000)))
 measurer.compute_heuristic(bias_id)
 
 biasedDataset, unbiasedDataset = measurer.split_data_by_heuristics(squad_en['train'], bias_id)
 
-squad_train = biasedDataset.filter(lambda entry: len(entry["context"]) < 2000)
+squad_train_biased = biasedDataset.filter(lambda entry: len(entry["context"]) < 2000)
 
-mixin_objective = LearnedMixinH(lang_module,
-                                biased_model=biased_model_path,
-                                texts_or_path=squad_train["question"],
-                                text_pair_or_path=squad_train["context"],
-                                labels_or_path=[a["text"][0] for a in squad_train["answers"]],
-                                val_texts_or_path=squad_en["validation"]["question"][:num_val_samples],
-                                val_text_pair_or_path=squad_en["validation"]["context"][:num_val_samples],
-                                val_labels_or_path=[a["text"][0] for a in squad_en["validation"]["answers"]][:num_val_samples],
-                                batch_size=3,
-                                val_evaluators=val_metrics,
-                                objective_id="SQUAD-en-biased")
+mixin_objective = ExtractiveQA(lang_module,
+                               texts_or_path=squad_train_biased["question"],
+                               text_pair_or_path=squad_train_biased["context"],
+                               labels_or_path=[a["text"][0] for a in squad_train_biased["answers"]],
+                               val_texts_or_path=squad_en["validation"]["question"][:num_val_samples],
+                               val_text_pair_or_path=squad_en["validation"]["context"][:num_val_samples],
+                               val_labels_or_path=[a["text"][0] for a in squad_en["validation"]["answers"]][:num_val_samples],
+                               batch_size=3,
+                               val_evaluators=val_metrics,
+                               objective_id="SQUAD-en-biased")
 
 schedule = ParallelSchedule(objectives=[mixin_objective],
                             args=training_arguments)
