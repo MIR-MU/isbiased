@@ -6,7 +6,7 @@ from torch import nn
 from transformers import BertModel, BertPreTrainedModel
 from transformers.modeling_outputs import QuestionAnsweringModelOutput
 
-from debiasing_methods.confidenceRegularization.distill_loss import ClfDistillLossFunction
+from debiasing_methods.confidenceRegularization.overrides.loss import ClfDistillLossFunction
 
 
 class BertDistill(BertPreTrainedModel):

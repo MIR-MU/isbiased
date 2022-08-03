@@ -5,8 +5,8 @@ from transformers import AutoTokenizer, AutoModelForQuestionAnswering, DefaultDa
 
 import torch
 
-from debiasing_methods.confidenceRegularization.distill_loss import SmoothedDistillLoss
-from debiasing_methods.confidenceRegularization.bert_distill import BertDistill, BertDistillForQuestionAnswering
+from debiasing_methods.confidenceRegularization.overrides.loss import SmoothedDistillLoss
+from debiasing_methods.confidenceRegularization.overrides.models import BertDistill, BertDistillForQuestionAnswering
 from debiasing_methods.confidenceRegularization.utils import prepare_train_features
 
 
