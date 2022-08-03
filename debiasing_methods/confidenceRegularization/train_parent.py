@@ -11,6 +11,7 @@ import pandas as pd
 
 from debiasing_methods.confidenceRegularization.utils import prepare_train_features
 
+dirname = os.getcwd()
 
 def main():
     parser = argparse.ArgumentParser()
@@ -19,9 +20,9 @@ def main():
     parser.add_argument("--model", default="./saved_models/bert-base-uncased_finetuned_baseline", type=str,
                         help="Bert pre-trained model")
     parser.add_argument("--output_dir",
-                        default="./results",
+                        default="./saved_models",
                         type=str,
-                        help="The output directory where the model predictions and checkpoints will be written.")
+                        help="The output directory where the model and checkpoints will be written.")
     parser.add_argument("--preds_dir",
                         default="./dataset",
                         type=str,
@@ -91,6 +92,7 @@ def main():
 
     model_checkpoint = args.model
     print("Model:   ", model_checkpoint)
+    model_save_path = os.path.join(dirname, 'saved_models', model_checkpoint)
 
     tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
     model = AutoModelForQuestionAnswering.from_pretrained(model_checkpoint)
@@ -104,9 +106,14 @@ def main():
 
     if args.do_train:
         training_args = TrainingArguments(
-            output_dir=args.output_dir,
-            # evaluation_strategy="epoch",
-            evaluation_strategy="no",  # for testing
+            output_dir=model_save_path,
+            # evaluation_strategy="no",  # for testing
+            evaluation_strategy="steps",
+            eval_steps=200,  # Evaluation and Save happens every 200 steps
+            save_steps=200,
+            logging_steps=200,
+            save_total_limit=5,  # Only last 5 models are saved. Older ones are deleted.
+            report_to="none",
             learning_rate=args.learning_rate,
             per_device_train_batch_size=args.train_batch_size,
             gradient_accumulation_steps=args.gradien_accumulation_steps,
@@ -115,6 +122,7 @@ def main():
             num_train_epochs=args.num_train_epochs,
             warmup_ratio=args.warmup_proportion,
             weight_decay=0.01,
+            load_best_model_at_end=True,
             disable_tqdm=True
         )
 
@@ -130,16 +138,14 @@ def main():
 
         print("Starting training...")
         trainer.train()
-        trainer.save_model(model_checkpoint)
+        trainer.save_model(model_save_path)
 
-        print(f"Model trained 🤗 state_dict saved at:    {model_checkpoint}")
+        print(f"Model trained 🤗 state_dict saved at:    {model_save_path}")
 
     training_args = TrainingArguments(
-        output_dir=args.output_dir,
-        # evaluation_strategy="epoch",
-        evaluation_strategy="no",  # for testing
+        output_dir=model_save_path,
         per_device_eval_batch_size=args.eval_batch_size,
-        max_steps=2,  # for testing
+        # max_steps=2,  # for testing
         disable_tqdm=False
     )
 
@@ -150,7 +156,6 @@ def main():
         data_collator=data_collator,
     )
 
-    # predictions, label_ids, metrics = trainer.predict(test_dataset=tokenized_squad['train'].train_test_split(train_size=5)['train'])
     predictions, label_ids, metrics = trainer.predict(test_dataset=tokenized_squad['train'])
     # predictions contain outputs of net for all examples shape:
     #       2(as for start_logits and end_logits) * num_examples(dataset size) * num_outputs(output dimension of net)
