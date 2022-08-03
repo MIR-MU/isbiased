@@ -11,7 +11,8 @@ from isbiased.bias_significance import BiasSignificanceMeasure
 
 # parameters
 biased_model_path = "bert-base-multilingual-cased"
-full_dataset_model_path = "../models/electra-base-discriminator-finetuned-squad_with_callbacks_baseline"
+# full_dataset_model_path = "../models/electra-base-discriminator-finetuned-squad_with_callbacks_baseline"
+full_dataset_model_path = "/mnt/local/disk1/klasifikace_reflexe/think_twice/isbiased/models/roberta-base-orig"
 
 num_val_samples = 200
 # end parameters
@@ -39,9 +40,12 @@ val_metrics = [F1ScoreForQA(decides_convergence=True)]
 squad_en = load_dataset("squad")
 
 bias_id = "distances"
-measurer = BiasSignificanceMeasure(squad_en['train'].select(range(2000)))
+
+# measurer = BiasSignificanceMeasure(squad_en['train'].select(range(2000)))
+measurer = BiasSignificanceMeasure(squad_en['train'])
 # we need already-trained model for this
-measurer.evaluate_model_on_dataset(full_dataset_model_path, squad_en['validation'].select(range(2000)))
+# measurer.evaluate_model_on_dataset(full_dataset_model_path, squad_en['validation'].select(range(2000)))
+measurer.evaluate_model_on_dataset(full_dataset_model_path, squad_en['validation'])
 measurer.compute_heuristic(bias_id)
 
 biasedDataset, unbiasedDataset = measurer.split_data_by_heuristics(squad_en['train'], bias_id)
