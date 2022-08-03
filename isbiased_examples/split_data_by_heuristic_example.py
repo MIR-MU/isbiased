@@ -31,7 +31,6 @@ bias_significance.evaluate_model_on_dataset(model_path, datasets['validation'].s
 # 'max_sim_ents'
 # 'answer_subject_positions'
 heuristic = 'distances'
-bias_significance.compute_heuristic(heuristic)
 
 # when you have computed heuristic and predictions
 # you can split dataset of your choice based on selected heuristic

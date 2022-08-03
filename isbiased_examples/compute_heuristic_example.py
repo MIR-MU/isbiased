@@ -30,5 +30,5 @@ bias_significance.evaluate_model_on_dataset(model_path, datasets['validation'])
 # 'max_sim_ents'
 # 'answer_subject_positions'
 heuristic = 'distances'
-bias_significance.compute_heuristic(heuristic)
+bias_significance._compute_heuristic(heuristic)
 

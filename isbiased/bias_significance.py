@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from datasets import Dataset
 from datasets import load_dataset, load_metric
+from sklearn.utils import compute_class_weight
 from tqdm.auto import tqdm
 from transformers import AutoModelForQuestionAnswering, BatchEncoding, Trainer
 from transformers import AutoTokenizer
@@ -189,7 +190,7 @@ class BiasSignificanceMeasure:
 
         return best_threshold, max_distance, distances_dictionary
 
-    def find_longest_distance(self, heuristic: str) -> Tuple[float, float, Dict[float, float]]:
+    def find_longest_distance(self, heuristic: str) -> Tuple[float, float, Dict[float, float]]: #TODO rename, something like evaluate_heuristic can be better
         """Finds out the longest distance between intervals for thresholds
 
         Args:
@@ -206,6 +207,8 @@ class BiasSignificanceMeasure:
 
         distance_em = 0
         distance_f1 = 0
+
+        self.data = self._compute_heuristic(heuristic)
 
         min_value_for_threshold = int(self.data[heuristic].min()) + 1 if self.data[heuristic].min() > 0 else 0
         max_value_for_threshold = self.data[heuristic].max()
@@ -476,7 +479,7 @@ class BiasSignificanceMeasure:
         squad_with_heuristics.compute_all_heuristics()
         self.data = squad_with_heuristics.data
 
-    def compute_heuristic(self, heuristic: str):
+    def _compute_heuristic(self, heuristic: str) -> pd.DataFrame:
         """Computes specific heuristic for the dataset
 
         Args:
@@ -486,7 +489,7 @@ class BiasSignificanceMeasure:
 
         computed_heuristic = ComputeHeuristics(self.data, train_dataset)
         computed_heuristic.compute_heuristic(heuristic)
-        self.data = computed_heuristic.data
+        return computed_heuristic.data
 
     def split_data_by_heuristics(self, dataset: Dataset, heuristic: str) -> Tuple[Dataset, Dataset]:
         """Splits dataset based on selected heuristics and it's best threshold
@@ -505,7 +508,7 @@ class BiasSignificanceMeasure:
         # print(dist_dict)
 
         if best_threshold != -1:
-            comp_heuristic = ComputeHeuristics(pd.DataFrame(dataset), pd.DataFrame(dataset))
+            comp_heuristic = ComputeHeuristics(pd.DataFrame(dataset), pd.DataFrame(load_dataset("squad")['train']))
             comp_heuristic.compute_heuristic(heuristic)
             dataset = comp_heuristic.data
 
