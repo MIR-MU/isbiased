@@ -437,7 +437,7 @@ class BiasSignificanceMeasure:
             if save_dataframe_with_predictions:
                 data = pd.DataFrame(dataset_eval)
                 data['prediction_text'] = predictions
-                data.to_json('./datasets/' + name + '.json', orient='records')
+            #     data.to_json('./datasets/' + name + '.json', orient='records')
 
             return metric.compute(predictions=formatted_predictions, references=references), data
 
