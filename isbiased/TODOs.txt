@@ -1,0 +1,4 @@
+TODO:
+
+1. bias_significance.split_data_by_heuristics could also return f-score (parametrized option?)
+2. evaluation loop for a single model over all heuristics?
