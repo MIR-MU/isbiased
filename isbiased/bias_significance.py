@@ -1,13 +1,14 @@
 import collections
 from statistics import mean
-from typing import Dict
+from typing import Dict, Tuple, List
+from xmlrpc.client import boolean
 
 import numpy as np
 import pandas as pd
 from datasets import Dataset
 from datasets import load_dataset, load_metric
 from tqdm.auto import tqdm
-from transformers import AutoModelForQuestionAnswering, Trainer
+from transformers import AutoModelForQuestionAnswering, BatchEncoding, Trainer
 from transformers import AutoTokenizer
 from transformers import default_data_collator
 
@@ -18,39 +19,41 @@ class BiasSignificanceMeasure:
     num_for_average_metrics = 1
     metric = load_metric("squad")
 
-    def __init__(self, data: Dataset, iterations=100, sample_size=800):
-        # TODO: comment
-        # TODO: types of all input parameters
+    def __init__(self, data: Dataset, iterations: int = 100, sample_size: int = 800):
+        """Initialization of BiasSignificanceMeasure
+
+        Args:
+            data (Dataset): _description_
+            iterations (int, optional): number of iterations for bootstrapping bias significance measure. Defaults to 100.
+            sample_size (int, optional): sample size for bootstrapping bias significance measure. Defaults to 800.
+        """
         self.data = pd.DataFrame(data)
         self.iterations = iterations
         self.sample_size = sample_size
 
-    def _compute_metrics_for_sample(self, sample) -> Dict[str, float]:
-        # TODO: see the return type annotation ^^ and use it for all public methods
-        # TODO: types of all input parameters
+    def _compute_metrics_for_sample(self, sample: pd.DataFrame) -> Dict[str, float]:
         """Computation of metrics for dataset sample
         Computes exact match and F1 between predicted and ground truth answers
 
         Args:
-            sample (Dataframe): sample from dataset
+            sample (pd.DataFrame): sample from dataset
 
         Returns:
-            dict: computed metrics
+            Dict[str, float]: computed metrics - exact match and f1 score
         """
         formatted_predictions = [{"id": k, "prediction_text": v} for k, v in
                                  zip(sample['id'], sample['prediction_text'])]
         references = [{"id": ex["id"], "answers": ex["answers"]} for ex in sample]
         return self.metric.compute(predictions=formatted_predictions, references=references)
 
-    def _compute_metrics_for_bunch(self, data):
-        # TODO: types of all input parameters
+    def _compute_metrics_for_bunch(self, data: pd.DataFrame) -> pd.DataFrame:
         """Sampling the dataset for specified number of iterations and computation of metrics for samples
 
         Args:
-            data (Pandas Dataframe): dataset with computed heuristics
+            data (pd.DataFrame): dataset with computed heuristics
 
         Returns:
-            Pandas Dataframe: computed heuristics for samples
+            pd.DataFrame: computed heuristics for samples
         """
         exact_list = []
         f1_list = []
@@ -67,19 +70,18 @@ class BiasSignificanceMeasure:
 
         return df
 
-    def _find_the_distance_between_intervals(self, lower_025, lower_975, higher_025, higher_975):
-        # TODO: types of all input parameters
+    def _find_the_distance_between_intervals(self, lower_025: int, lower_975: int, higher_025: int, higher_975: int) -> Tuple[bool, float]:
         """Detect if there is some interval overlap between the two intervals or if there is not
         If there is not an overlap, it computes the distance between 2.5% and 97.5% quantiles
 
         Args:
             lower_025 (int): 2.5% quantile for lower subset
-            lower_975 (int): 97.5% quantile for higher subset
-            higher_025 (int): 2.5% quantile for lower subset
+            lower_975 (int): 97.5% quantile for lower subset
+            higher_025 (int): 2.5% quantile for higher subset
             higher_975 (int): 97.5% quantile for higher subset
 
         Returns:
-            bool, decimal: boolean flag and the distance between intervals
+            Tuple[bool, float]: boolean flag and the distance between intervals
         """
         distance_between_intervals = 0
         if lower_975 > higher_025 and lower_025 > higher_975:
@@ -91,18 +93,16 @@ class BiasSignificanceMeasure:
         else:
             return False, distance_between_intervals
 
-    def _compute_metrics_average_split(self, heuristic, threshold):
-        # TODO: types of all input parameters
+    def _compute_metrics_average_split(self, heuristic: str, threshold: float) -> List[float]:
         """Function which calls the previous ones and provide dataset splits and logging into files
 
         Args:
             heuristic (str): column of the dataset based on which we want to split the data
-            threshold (decimal): number for the split of dataset, the values lower or equal will be in one subset and values higher than the threshold will be in the other
+            threshold (float): number for the split of dataset, the values lower or equal will be in one subset and values higher than the threshold will be in the other
 
         Returns:
-            decimal, decimal: distances for both metrics, exact match and F1
+            List[float]: distances for both metrics, exact match and F1, size of lower and higher dataset and 97.5% quntiles for both
         """
-
         if heuristic == 'distances':
             data_higher, data_lower = [x for _, x in
                                        self.data[self.data.distances >= 0].groupby(self.data[heuristic] <= threshold)]
@@ -165,8 +165,15 @@ class BiasSignificanceMeasure:
         return [distance_em, distance_f1, len(data_lower), len(data_higher), mean(lower_exact_match_quantile_975),
                 mean(higher_exact_match_quantile_975)]
 
-    def _find_best_threshold_for_heuristic(self, distances_dictionary: dict):
-        # TODO: types of all input parameters: should be Dict[key_type, value_type]
+    def _find_best_threshold_for_heuristic(self, distances_dictionary: Dict[float, float]) -> Tuple[float, float, Dict[float, float]]:
+        """Finds the best threshold from dictionary of thresholds
+
+        Args:
+            distances_dictionary (Dict[float, float]): dictionary with thresholds as keys, distances, lengths and qunatiles as values
+
+        Returns:
+            Tuple[float, float, Dict[float, float]]: best threshold, maximum distance (exact match) and the dictionary
+        """
         best_threshold = -1
         max_distance = -1
         size_of_smaller = 0
@@ -182,15 +189,14 @@ class BiasSignificanceMeasure:
 
         return best_threshold, max_distance, distances_dictionary
 
-    def find_longest_distance(self, heuristic: str):
-        """Finds out the longest distance between intervals for bunch of thresholds
+    def find_longest_distance(self, heuristic: str) -> Tuple[float, float, Dict[float, float]]:
+        """Finds out the longest distance between intervals for thresholds
 
         Args:
-            heuristic (str): Dataframe column
-        TODO: these are not the args of this method:
-            low_bound (int): the number from which the threshold will start from
-            upp_bound (int): the number for which the threshold will go -1
+            heuristic (str): identicator of the heuristic
 
+        Returns:
+            Tuple[float, float, Dict[float, float]]: best threshold, maximum distance (exact match) and the dictionary returned from the _find_best_threshold_for_heuristic() method
         """
         index_em = 0
         index_f1 = 0
@@ -231,16 +237,18 @@ class BiasSignificanceMeasure:
 
         return self._find_best_threshold_for_heuristic(distances_dict)
 
-    def evaluate_model_on_dataset(self, model_path: str, dataset_eval: Dataset):
-        # TODO: docs
-        # TODO: parameter types
-        # TODO: return type annotation
-        squad_v2 = False
-        model_checkpoint = "roberta-large"
-        m_name = model_path.split("/")[-1]
-        # saved_model = 'models/roberta-large-finetuned-squad_with_callbacks_baseline'
-        # saved_model = model_path
+    def evaluate_model_on_dataset(self, model_path: str, dataset_eval: Dataset) -> Dict[str, float]:
+        """Evaluation of fine-tuned model on selected dataset
 
+        Args:
+            model_path (str): path to the QA model, it can be local path or path to model from HF hub
+            dataset_eval (Dataset): dataset for evaluation
+
+        Returns:
+            Dict[str, float]: metrics for dataset - exact match and f1 score
+        """
+        squad_v2 = False
+        m_name = model_path.split("/")[-1]
         tokenizer = AutoTokenizer.from_pretrained(model_path)
         model = AutoModelForQuestionAnswering.from_pretrained(model_path)
         data_collator = default_data_collator
@@ -250,8 +258,6 @@ class BiasSignificanceMeasure:
         max_length = 384
         doc_stride = 128
 
-        model_name = model_checkpoint.split("/")[-1]
-
         trainer = Trainer(
             model,
             data_collator=data_collator,
@@ -260,10 +266,15 @@ class BiasSignificanceMeasure:
 
         # Preprocessing function for validation dataset from the HuggingFace Jupyter notebook
         # with original comments
-        def prepare_validation_features(examples):
-            # TODO: docs
-            # TODO: parameter types
-            # TODO: return type annotation
+        def prepare_validation_features(examples) -> BatchEncoding:
+            """Function for processing batches of validation dataset
+
+            Args:
+                examples (datasets.arrow_dataset.Batch): batches of the dataset
+
+            Returns:
+                BatchEncoding: prepared batches of the dataset
+            """
 
             # Some of the questions have lots of whitespace on the left, which is not useful and will make the
             # truncation of the context fail (the tokenized question will take a lots of space). So we remove that
@@ -308,15 +319,25 @@ class BiasSignificanceMeasure:
                     for k, o in enumerate(tokenized_examples["offset_mapping"][i])
                 ]
 
+
             return tokenized_examples
 
         # Postprocessing function from the HuggingFace Jupyter notebook
         # with original comments
-        def postprocess_qa_predictions(examples, features, raw_predictions, n_best_size=20, max_answer_length=30):
-            # TODO: docs
-            # TODO: parameter types
-            # TODO: return type annotation
+        def postprocess_qa_predictions(examples: Dataset, features: Dataset, raw_predictions: Tuple[List[float], List[float]], n_best_size: int = 20, max_answer_length: int = 30) -> collections.OrderedDict[str, str]:
+            """Postprocessing of predictions of the QA model
 
+            Args:
+                examples (Dataset): validation dataset
+                features (Dataset): batched and processed dataset
+                raw_predictions (Tuple[List[float], List[float]]): arrays of start and end logits
+                n_best_size (int, optional): number of best logits to search. Defaults to 20.
+                max_answer_length (int, optional): length of the asnwer. Defaults to 30.
+
+            Returns:
+                collections.OrderedDict: _description_
+            """
+            
             all_start_logits, all_end_logits = raw_predictions
             # Build a map example to its corresponding features.
             example_id_to_index = {k: i for i, k in enumerate(examples["id"])}
@@ -398,24 +419,22 @@ class BiasSignificanceMeasure:
                     answer = best_answer["text"] if best_answer["score"] > min_null_score else ""
                     predictions[example["id"]] = answer
 
+
             return predictions
 
-        def model_evaluation_on_dataset(dataset_eval, save_dataframe_with_predictions=False, name='model_name'):
-            # TODO: parameter types
-            # TODO: return type annotation
-
+        def model_evaluation_on_dataset(dataset_eval: Dataset, save_dataframe_with_predictions: bool = False, name: str = 'model_name') -> Tuple[Dict[str, float], pd.DataFrame]:
             """Model evaluation on specific dataset
             Calls previous functions and evaluate the dataset on the model for exact match and F1
 
             Args:
-                # TODO: not the method arg:
-                dataset (Dataset): validation dataset
+                dataset_eval (Dataset): validation dataset
                 save_dataframe_with_predictions (bool, optional): flag for saving the dataset with prediction. Defaults to False.
-                name (str, optional): name of the model. Defaults to 'model_name'.
+                name (str, optional): name of the model.. Defaults to 'model_name'.
 
             Returns:
-                _type_: _description_
+                Tuple[Dict[str, float], pd.DataFrame]: dictionary of metrics and dataframe with predictions
             """
+
             validation_features = dataset_eval.map(
                 prepare_validation_features,
                 batched=True,
@@ -437,7 +456,7 @@ class BiasSignificanceMeasure:
             if save_dataframe_with_predictions:
                 data = pd.DataFrame(dataset_eval)
                 data['prediction_text'] = predictions
-                data.to_json('./datasets/' + name + '.json', orient='records')
+                # data.to_json('./datasets/' + name + '.json', orient='records')
 
             return metric.compute(predictions=formatted_predictions, references=references), data
 
@@ -448,9 +467,8 @@ class BiasSignificanceMeasure:
         return metrics
 
     def compute_heuristics(self):
-        # TODO: docs
-        # TODO: return type annotation
-
+        """Computes all heuristics for the dataset
+        """
         # train_dataset = pd.read_json('./datasets/squad_train.json')
         train_dataset = pd.DataFrame(load_dataset("squad")['train'])
 
@@ -459,18 +477,28 @@ class BiasSignificanceMeasure:
         self.data = squad_with_heuristics.data
 
     def compute_heuristic(self, heuristic: str):
-        # TODO: docs
-        # TODO: return type annotation
+        """Computes specific heuristic for the dataset
+
+        Args:
+            heuristic (str): identificator of the heuristic
+        """
         train_dataset = pd.DataFrame(load_dataset("squad")['train'])
 
         computed_heuristic = ComputeHeuristics(self.data, train_dataset)
         computed_heuristic.compute_heuristic(heuristic)
         self.data = computed_heuristic.data
 
-    def split_data_by_heuristics(self, dataset: Dataset, heuristic: str):
-        # TODO: docs
-        # TODO: return type annotation
+    def split_data_by_heuristics(self, dataset: Dataset, heuristic: str) -> Tuple[Dataset, Dataset]:
+        """Splits dataset based on selected heuristics and it's best threshold
+        into biased and unbiased subsets
 
+        Args:
+            dataset (Dataset): dataset to be split
+            heuristic (str): identificator of the heuristic
+
+        Returns:
+            Tuple[Dataset, Dataset]: biased subset and unbiased subset of the dataset, if the dataset is not split, it returns the original dataset
+        """
         best_threshold, distance, dist_dict = self.find_longest_distance(heuristic)
         # print(best_threshold)
         # print(distance)
