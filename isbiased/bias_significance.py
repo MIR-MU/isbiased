@@ -1,19 +1,17 @@
 import collections
 from statistics import mean
 from typing import Dict, Tuple, List
-from xmlrpc.client import boolean
 
 import numpy as np
 import pandas as pd
 from datasets import Dataset
 from datasets import load_dataset, load_metric
-from sklearn.utils import compute_class_weight
 from tqdm.auto import tqdm
 from transformers import AutoModelForQuestionAnswering, BatchEncoding, Trainer
 from transformers import AutoTokenizer
 from transformers import default_data_collator
 
-from .heuristics import *
+from .heuristics import ComputeHeuristics
 
 
 class BiasSignificanceMeasure:
@@ -24,7 +22,8 @@ class BiasSignificanceMeasure:
         """Initialization of BiasSignificanceMeasure
 
         Args:
-            iterations (int, optional): number of iterations for bootstrapping bias significance measure. Defaults to 100.
+            iterations (int, optional): number of iterations for bootstrapping bias significance measure. \
+                Defaults to 100.
             sample_size (int, optional): sample size for bootstrapping bias significance measure. Defaults to 800.
         """
         self.iterations = iterations
@@ -69,7 +68,8 @@ class BiasSignificanceMeasure:
 
         return df
 
-    def _find_the_distance_between_intervals(self, lower_025: int, lower_975: int, higher_025: int, higher_975: int) -> Tuple[bool, float]:
+    def _find_the_distance_between_intervals(self, lower_025: int, lower_975: int, higher_025: int,
+                                             higher_975: int) -> Tuple[bool, float]:
         """Detect if there is some interval overlap between the two intervals or if there is not
         If there is not an overlap, it computes the distance between 2.5% and 97.5% quantiles
 
@@ -98,10 +98,12 @@ class BiasSignificanceMeasure:
         Args:
             dataset (pd.DataFrame): dataset for evaluation
             heuristic (str): column of the dataset based on which we want to split the data
-            threshold (float): number for the split of dataset, the values lower or equal will be in one subset and values higher than the threshold will be in the other
+            threshold (float): number for the split of dataset, the values lower or equal will be in one subset \
+                and values higher than the threshold will be in the other
 
         Returns:
-            List[float]: distances for both metrics, exact match and F1, size of lower and higher dataset and 97.5% quntiles for both
+            List[float]: distances for both metrics, exact match and F1, size of lower and higher dataset \
+                and 97.5% quntiles for both
         """
         if heuristic == 'distances':
             data_higher, data_lower = [x for _, x in
@@ -158,18 +160,18 @@ class BiasSignificanceMeasure:
                                                                                    mean(higher_f1_quantile_025),
                                                                                    mean(higher_f1_quantile_975))
 
-        # print(f"Average exact match with params: samples {self.sample_size} iters {self.iterations} ---- are independent: {is_not_overlap_em} the distance is: {distance_em}")
-
-        # print(f"Average f1 with params: samples {self.sample_size} iters {self.iterations} ---- are independent: {is_not_overlap_f1} the distance is: {distance_f1}")
-
         return [distance_em, distance_f1, len(data_lower), len(data_higher), mean(lower_exact_match_quantile_975),
                 mean(higher_exact_match_quantile_975)]
 
-    def _find_best_threshold_for_heuristic(self, distances_dictionary: Dict[float, float]) -> Tuple[float, float, Dict[float, float]]:
+    def _find_best_threshold_for_heuristic(self,
+                                           distances_dictionary: Dict[float, List[float]]) -> Tuple[float, float,
+                                                                                                    Dict[float,
+                                                                                                         List[float]]]:
         """Finds the best threshold from dictionary of thresholds
 
         Args:
-            distances_dictionary (Dict[float, float]): dictionary with thresholds as keys, distances, lengths and qunatiles as values
+            distances_dictionary (Dict[float, float]): dictionary with thresholds as keys, distances, lengths \
+                and qunatiles as values
 
         Returns:
             Tuple[float, float, Dict[float, float]]: best threshold, maximum distance (exact match) and the dictionary
@@ -189,7 +191,10 @@ class BiasSignificanceMeasure:
 
         return best_threshold, max_distance, distances_dictionary
 
-    def find_longest_distance(self, dataset: Dataset, heuristic: str) -> Tuple[float, float, Dict[float, float], Dataset]: #TODO rename, something like evaluate_heuristic can be better
+    # TODO rename, something like evaluate_heuristic
+    def find_longest_distance(self, dataset: Dataset, heuristic: str) -> Tuple[Tuple[float, float,
+                                                                                     Dict[float, List[float]]],
+                                                                               Dataset]:
         """Finds out the longest distance between intervals for thresholds
 
 
@@ -198,10 +203,9 @@ class BiasSignificanceMeasure:
             heuristic (str): identicator of the heuristic
 
         Returns:
-            Tuple[float, float, Dict[float, float], Dataset]: best threshold, maximum distance (exact match) and the dictionary returned from the _find_best_threshold_for_heuristic() method, and dataset
+            Tuple[float, float, Dict[float, float], Dataset]: best threshold, maximum distance (exact match) \
+                and the dictionary returned from the _find_best_threshold_for_heuristic() method, and dataset
         """
-        index_em = 0
-        index_f1 = 0
         max_em_distance = 0
         max_f1_distance = 0
         distances_dict = {}
@@ -216,30 +220,18 @@ class BiasSignificanceMeasure:
         min_value_for_threshold = int(dfdataset[heuristic].min()) + 1 if dfdataset[heuristic].min() > 0 else 0
         max_value_for_threshold = dfdataset[heuristic].max()
 
-        # print(f"Min value: {min_value_for_threshold} and max value: {max_value_for_threshold}")
-
         while (min_value_for_threshold < max_value_for_threshold):
-            # distance_em, distance_f1 = self._compute_metrics_average_split(heuristic, min_value_for_threshold)
             distances_dict[min_value_for_threshold] = self._compute_metrics_average_split(dfdataset, heuristic,
                                                                                           min_value_for_threshold)
             if distance_em > max_em_distance:
-                # max_em_distance = distance_em
                 max_em_distance = distances_dict.get(min_value_for_threshold)[0]
-                index_em = min_value_for_threshold
             if distance_f1 > max_f1_distance:
-                # max_f1_distance = distance_f1
                 max_f1_distance = distances_dict.get(min_value_for_threshold)[1]
-                index_f1 = min_value_for_threshold
-
-            # distances_dict[min_value_for_threshold] = [distance_em, distance_f1]
 
             if max_value_for_threshold > 1:
                 min_value_for_threshold += 1
             else:
                 min_value_for_threshold += 0.1
-
-        # print(f"The biggest distance between exact match intervals was with threshold {index_em} and the distance was {max_em_distance}.")
-        # print(f"The biggest distance between f1 intervals was with threshold {index_f1} and the distance was {max_f1_distance}.")
 
         return self._find_best_threshold_for_heuristic(distances_dict), Dataset.from_pandas(dfdataset)
 
@@ -325,12 +317,13 @@ class BiasSignificanceMeasure:
                     for k, o in enumerate(tokenized_examples["offset_mapping"][i])
                 ]
 
-
             return tokenized_examples
 
         # Postprocessing function from the HuggingFace Jupyter notebook
         # with original comments
-        def postprocess_qa_predictions(examples: Dataset, features: Dataset, raw_predictions: Tuple[List[float], List[float]], n_best_size: int = 20, max_answer_length: int = 30) -> collections.OrderedDict[str, str]:
+        def postprocess_qa_predictions(examples: Dataset, features: Dataset,
+                                       raw_predictions: Tuple[List[float], List[float]], n_best_size: int = 20,
+                                       max_answer_length: int = 30) -> collections.OrderedDict[str, str]:
             """Postprocessing of predictions of the QA model
 
             Args:
@@ -343,7 +336,7 @@ class BiasSignificanceMeasure:
             Returns:
                 collections.OrderedDict: _description_
             """
-            
+
             all_start_logits, all_end_logits = raw_predictions
             # Build a map example to its corresponding features.
             example_id_to_index = {k: i for i, k in enumerate(examples["id"])}
@@ -414,8 +407,8 @@ class BiasSignificanceMeasure:
                 if len(valid_answers) > 0:
                     best_answer = sorted(valid_answers, key=lambda x: x["score"], reverse=True)[0]
                 else:
-                    # In the very rare edge case we have not a single non-null prediction, we create a fake prediction to avoid
-                    # failure.
+                    # In the very rare edge case we have not a single non-null prediction,
+                    # we create a fake prediction to avoid failure.
                     best_answer = {"text": "", "score": 0.0}
 
                 # Let's pick our final answer: the best one or the null answer (only for squad_v2)
@@ -425,16 +418,17 @@ class BiasSignificanceMeasure:
                     answer = best_answer["text"] if best_answer["score"] > min_null_score else ""
                     predictions[example["id"]] = answer
 
-
             return predictions
 
-        def model_evaluation_on_dataset(dataset_eval: Dataset, save_dataframe_with_predictions: bool = False, name: str = 'model_name') -> Tuple[Dict[str, float], Dataset]:
+        def model_evaluation_on_dataset(dataset_eval: Dataset, save_dataframe_with_predictions: bool = False,
+                                        name: str = 'model_name') -> Tuple[Dict[str, float], Dataset]:
             """Model evaluation on specific dataset
             Calls previous functions and evaluate the dataset on the model for exact match and F1
 
             Args:
                 dataset_eval (Dataset): validation dataset
-                save_dataframe_with_predictions (bool, optional): flag for saving the dataset with prediction. Defaults to False.
+                save_dataframe_with_predictions (bool, optional): flag for saving the dataset with prediction. \
+                    Defaults to False.
                 name (str, optional): name of the model.. Defaults to 'model_name'.
 
             Returns:
@@ -467,8 +461,8 @@ class BiasSignificanceMeasure:
             return metric.compute(predictions=formatted_predictions, references=references), Dataset.from_pandas(data)
 
         metrics, dataset = model_evaluation_on_dataset(dataset_eval,
-                                                         save_dataframe_with_predictions=True,
-                                                         name=m_name)
+                                                       save_dataframe_with_predictions=True,
+                                                       name=m_name)
 
         return metrics, dataset
 
@@ -507,7 +501,8 @@ class BiasSignificanceMeasure:
         computed_heuristic.compute_heuristic(heuristic)
         return computed_heuristic.data
 
-    def split_data_by_heuristics(self, dataset_for_evaluation: Dataset, dataset_for_split: Dataset, heuristic: str) -> Tuple[Dataset, Dataset]:
+    def split_data_by_heuristics(self, dataset_for_evaluation: Dataset, dataset_for_split: Dataset,
+                                 heuristic: str) -> Tuple[Dataset, Dataset]:
         """Splits dataset based on selected heuristics and it's best threshold
         into biased and unbiased subsets
 
@@ -516,7 +511,8 @@ class BiasSignificanceMeasure:
             heuristic (str): identificator of the heuristic
 
         Returns:
-            Tuple[Dataset, Dataset]: biased subset and unbiased subset of the dataset, if the dataset is not split, it returns the original dataset
+            Tuple[Dataset, Dataset]: biased subset and unbiased subset of the dataset, if the dataset is not split, \
+                it returns the original dataset
         """
         threshold_distance_dictionary, ds = self.find_longest_distance(dataset_for_evaluation, heuristic)
         best_threshold, distance, dist_dict = threshold_distance_dictionary
@@ -525,7 +521,8 @@ class BiasSignificanceMeasure:
         # print(dist_dict)
 
         if best_threshold != -1:
-            comp_heuristic = ComputeHeuristics(pd.DataFrame(dataset_for_split), pd.DataFrame(load_dataset("squad")['train']))
+            comp_heuristic = ComputeHeuristics(pd.DataFrame(dataset_for_split),
+                                               pd.DataFrame(load_dataset("squad")['train']))
             comp_heuristic.compute_heuristic(heuristic)
             dataset = comp_heuristic.data
 
@@ -536,6 +533,6 @@ class BiasSignificanceMeasure:
 
         else:
             print('Dataset was not split!!!')
-            return (dataset, dataset)
+            return (dataset_for_split, dataset_for_split)
 
         return Dataset.from_pandas(biasedDataset), Dataset.from_pandas(unbiasedDataset)
