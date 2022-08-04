@@ -1,3 +1,4 @@
+import torch.cuda
 from adaptor.adapter import Adapter
 from adaptor.evaluators.question_answering import F1ScoreForQA
 from adaptor.lang_module import LangModule
@@ -21,7 +22,8 @@ num_val_samples = 200
 
 lang_module = LangModule(model_name)
 
-biased_model = AutoModelForQuestionAnswering.from_pretrained(biased_model_path)
+device = "cuda" if torch.cuda.is_available() else "cpu"
+biased_model = AutoModelForQuestionAnswering.from_pretrained(biased_model_path).to(device)
 
 # dataset resolution
 squad_en = load_dataset("squad")
