@@ -11,8 +11,11 @@ from datasets import load_dataset
 from isbiased.bias_significance import BiasSignificanceMeasure
 
 # changeable parameters
-biased_model_id = "bert-base-multilingual-cased"
-bias_id = "distances"
+biased_model_id = "bert-base-cased"
+# local:
+# biased_model_id = "bert-base-multilingual-cased"
+
+bias_id = "similar_words"
 
 # fixed env-specific parameters
 full_dataset_model_path = "/mnt/local/disk1/klasifikace_reflexe/think_twice/isbiased/models/roberta-base-orig"
