@@ -67,6 +67,9 @@ class DistillBertForQuestionAnswering(BertPreTrainedModel):
             output_attentions: Optional[bool] = None,
             output_hidden_states: Optional[bool] = None,
             return_dict: Optional[bool] = None,
+            bias=None,
+            teacher_probs=None,
+            labels = None,
     ) -> Union[Tuple[torch.Tensor], QuestionAnsweringModelOutput]:
         r"""
         start_positions (`torch.LongTensor` of shape `(batch_size,)`, *optional*):
@@ -113,8 +116,10 @@ class DistillBertForQuestionAnswering(BertPreTrainedModel):
 
             # TODO - check meaning of ignore_index
             loss_fct = self.loss_fn(ignore_index=ignored_index)
-            start_loss = loss_fct(start_logits, start_positions)
-            end_loss = loss_fct(end_logits, end_positions)
+            # fixme
+            # bias and teacher_preds have 2 dimensions = 0: start, 1:end
+            start_loss = loss_fct(start_logits, start_positions, bias, teacher_probs, labels)
+            end_loss = loss_fct(end_logits, end_positions, bias, teacher_probs, labels)
             total_loss = (start_loss + end_loss) / 2
 
         if not return_dict:
@@ -158,6 +163,9 @@ class DistillRobertaForQuestionAnswering(RobertaPreTrainedModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
+        bias = None,
+        teacher_probs = None,
+        labels=None,
     ) -> Union[Tuple[torch.Tensor], QuestionAnsweringModelOutput]:
         r"""
         start_positions (`torch.LongTensor` of shape `(batch_size,)`, *optional*):
@@ -204,8 +212,10 @@ class DistillRobertaForQuestionAnswering(RobertaPreTrainedModel):
 
             # TODO check meaning of ignore_index
             loss_fct = self.loss_fn(ignore_index=ignored_index)
-            start_loss = loss_fct(start_logits, start_positions)
-            end_loss = loss_fct(end_logits, end_positions)
+            # fixme
+            # bias and teacher_preds have 2 dimensions = 0: start, 1:end
+            start_loss = loss_fct(start_logits, start_positions, bias, teacher_probs, labels)
+            end_loss = loss_fct(end_logits, end_positions, bias, teacher_probs, labels)
             total_loss = (start_loss + end_loss) / 2
 
         if not return_dict:
@@ -250,6 +260,9 @@ class DistillElectraForQuestionAnswering(ElectraPreTrainedModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
+        bias=None,
+        teacher_probs=None,
+        labels=None,
     ) -> Union[Tuple[torch.Tensor], QuestionAnsweringModelOutput]:
         r"""
         start_positions (`torch.LongTensor` of shape `(batch_size,)`, *optional*):
@@ -294,8 +307,11 @@ class DistillElectraForQuestionAnswering(ElectraPreTrainedModel):
             end_positions = end_positions.clamp(0, ignored_index)
 
             loss_fct = self.loss_fn(ignore_index=ignored_index)
-            start_loss = loss_fct(start_logits, start_positions)
-            end_loss = loss_fct(end_logits, end_positions)
+
+            # fixme
+            # bias and teacher_preds have 2 dimensions = 0: start, 1:end
+            start_loss = loss_fct(start_logits, start_positions, bias, teacher_probs, labels)
+            end_loss = loss_fct(end_logits, end_positions, bias, teacher_probs, labels)
             total_loss = (start_loss + end_loss) / 2
 
         if not return_dict:

@@ -14,7 +14,7 @@ class ClfDistillLossFunction(nn.Module):
         :param logits: [batch, n_classes] logit score for each class
         :param bias: [batch, n_classes] log-probabilties from the bias for each class
         :param teach_probs: techer prediction probabilities # FIXME check values
-        :param labels: [batch] integer class labels
+        :param labels: [batch] integer class labels # FIXME nechapem co su labels
         :return: scalar loss
         """
         raise NotImplementedError()

@@ -7,6 +7,7 @@ import torch
 
 from debiasing_methods.confidenceRegularization.overrides.loss import SmoothedDistillLoss
 from debiasing_methods.confidenceRegularization.overrides.models import BertDistill, BertDistillForQuestionAnswering
+from debiasing_methods.confidenceRegularization.overrides.trainers import DistillerTrainer
 from debiasing_methods.confidenceRegularization.utils import prepare_train_features
 
 
@@ -115,18 +116,24 @@ def main():
     )
 
     # TODO - not working now!
-    # need to override Trainer, because of distillation
-    trainer = Trainer(
+    # need to override Trainer, because of distillation - model's loss function needs input of teacher_preds and biased_preds
+    trainer = DistillerTrainer(
         model=distilled_model,
         args=training_args,
         train_dataset=tokenized_squad["train"],
         eval_dataset=tokenized_squad["validation"],
+        # teacher_preds = load json from
+        #   debiasing_methods/confidenceRegularization/dataset/teacher_preds_bert-base-uncased_finetuned_baseline.json
+        #   pass somehow, so that model is fed with train_dataset
+        teacher_predictions=None,
+        # biased_preds = same as teacher_preds
+        #   debiasing_methods/confidenceRegularization/dataset/teacher_preds_*.json
+        biased_predictions=None,
         tokenizer=tokenizer,
         data_collator=data_collator,
     )
 
     trainer.train()
-    # generate teacher probs here and put with dataset
 
     trainer.evaluate(tokenized_squad['validation'])
     debiased_name = "debiased-conf_reg-" + model_checkpoint
