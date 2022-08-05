@@ -9,7 +9,7 @@ from transformers import Trainer, PreTrainedModel, TrainingArguments, DataCollat
 from transformers.trainer_utils import PredictionOutput, speed_metrics, EvalPrediction
 
 
-class DistillerTrainer:
+class DistillerTrainer(Trainer):
     def __init__(
             self,
             model: Union[PreTrainedModel, nn.Module] = None,
