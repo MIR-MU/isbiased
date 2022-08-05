@@ -1,4 +1,5 @@
 import argparse
+import os
 
 from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering, DefaultDataCollator, TrainingArguments, Trainer
@@ -6,10 +7,23 @@ from transformers import AutoTokenizer, AutoModelForQuestionAnswering, DefaultDa
 import torch
 
 from debiasing_methods.confidenceRegularization.overrides.loss import SmoothedDistillLoss
-from debiasing_methods.confidenceRegularization.overrides.models import BertDistill, BertDistillForQuestionAnswering
+from debiasing_methods.confidenceRegularization.overrides.models import *
 from debiasing_methods.confidenceRegularization.overrides.trainers import DistillerTrainer
 from debiasing_methods.confidenceRegularization.utils import prepare_train_features
 
+dirname = os.getcwd()
+
+def choose_distill_model(model_name: str, loss_fn: ClfDistillLossFunction):
+
+    match model_name:
+        case 'bert-base-uncased':
+            model = DistillBertForQuestionAnswering.from_pretrained(model_name, loss_fn=loss_fn)
+        case ['roberta-base','roberta-large']:
+            model = DistillRobertaForQuestionAnswering.from_pretrained(model_name, loss_fn=loss_fn)
+        case 'electra-base-discriminator':
+            model = DistillElectraForQuestionAnswering.from_pretrained(model_name, loss_fn=loss_fn)
+
+    return model
 
 def main():
     parser = argparse.ArgumentParser()
@@ -17,7 +31,8 @@ def main():
     ## Required parameters
     parser.add_argument("--model", default="bert-base-uncased", type=str,
                         help="Model to be debiased")
-
+    parser.add_argument("--dataset", default="squad", type=str,
+                        help="HuggingFace dataset name, e.g.: 'squad'")
     parser.add_argument("--output_dir",
                         default="./results",
                         type=str,
@@ -90,23 +105,25 @@ def main():
 
     model_checkpoint = args.model
     print("Model:   ", model_checkpoint)
+    debiased_name = "debiased-conf_reg-" + model_checkpoint
+    model_save_path = os.path.join(dirname, 'saved_models', debiased_name)
 
     tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
 
     loss_fn = SmoothedDistillLoss()
-    distilled_model = BertDistillForQuestionAnswering.from_pretrained(model_checkpoint, loss_fn=loss_fn)
+    distilled_model = choose_distill_model(args.model, loss_fn)
     distilled_model.to(device)
 
 
     # load teacher predictions and biased predictions
-    dataset = load_dataset("squad")
+    dataset = load_dataset(args.dataset)
     tokenized_squad = dataset.map(prepare_train_features, batched=True, remove_columns=dataset["train"].column_names,
                                   fn_kwargs={'tokenizer': tokenizer, 'args':args})
     print("Got dataset...")
     data_collator = DefaultDataCollator()
 
     training_args = TrainingArguments(
-        output_dir="./results",
+        output_dir=model_save_path,
         evaluation_strategy="epoch",
         learning_rate=2e-5,
         per_device_train_batch_size=16,
@@ -135,9 +152,7 @@ def main():
 
     trainer.train()
 
-    trainer.evaluate(tokenized_squad['validation'])
-    debiased_name = "debiased-conf_reg-" + model_checkpoint
-    trainer.save_model()
+    trainer.save_model(debiased_name)
 
 
 if __name__ == '__main__':
