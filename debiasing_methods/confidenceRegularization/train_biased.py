@@ -148,13 +148,17 @@ def main():
     biasedDataset = load_saved_split(teacher_model, True, args)
     unbiasedDataset = load_saved_split(teacher_model, False, args)
 
-    dataset_train = biasedDataset.map(prepare_train_features, batched=True,
+    biased_dataset_train = biasedDataset.map(prepare_train_features, batched=True,
                                       remove_columns=biasedDataset.column_names,
                                       fn_kwargs={'tokenizer': biased_tokenizer, 'args': args})
 
-    dataset_val = biasedDataset.select(range(1000)).map(prepare_train_features, batched=True,
+    unbiased_dataset_val = biasedDataset.select(range(1000)).map(prepare_train_features, batched=True,
                                                         remove_columns=unbiasedDataset.column_names,
                                                         fn_kwargs={'tokenizer': biased_tokenizer, 'args': args})
+
+    tokenized_dataset_train = squad_en.map(prepare_train_features, batched=True,
+                                      remove_columns=squad_en['train'].column_names,
+                                      fn_kwargs={'tokenizer': biased_tokenizer, 'args': args})
 
     print("Got dataset...")
     data_collator = DefaultDataCollator()
@@ -184,8 +188,8 @@ def main():
         trainer = Trainer(
             model=biased_model,
             args=training_args,
-            train_dataset=dataset_train,
-            eval_dataset=dataset_val,
+            train_dataset=biased_dataset_train,
+            eval_dataset=unbiased_dataset_val,
             tokenizer=biased_tokenizer,
             data_collator=data_collator,
             callbacks=[EarlyStoppingCallback(early_stopping_patience=10)]
@@ -212,7 +216,8 @@ def main():
         data_collator=data_collator,
     )
 
-    predictions, label_ids, metrics = trainer.predict(test_dataset=dataset_train)
+    # prediction of whole dataset - predictions of BIASED model (trained on biased examples)
+    predictions, label_ids, metrics = trainer.predict(test_dataset=tokenized_dataset_train)
     # predictions contain outputs of net for all examples shape:
     #       2(as for start_logits and end_logits) * num_examples(dataset size) * num_outputs(output dimension of net)
     #           first row of shape is start_logits, second row is end_logits
@@ -220,7 +225,7 @@ def main():
     data = pd.DataFrame()
     data['start_logits'] = pd.Series(predictions[0].tolist())
     data['end_logits'] = pd.Series(predictions[1].tolist())
-    predictions_path = os.path.join(args.preds_dir, "biased_preds" + "_" + biased_checkpoint + ".json")
+    predictions_path = os.path.join(args.preds_dir, "biased_preds" + "_" + biased_checkpoint + "_" + args.dataset +".json")
     data.to_json(predictions_path)
 
     print(f"Knowledge distillation completed! 👌 \n"
