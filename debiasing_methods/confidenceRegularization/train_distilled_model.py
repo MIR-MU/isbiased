@@ -1,7 +1,10 @@
 import argparse
 import os
 
-from datasets import load_dataset
+import pandas as pd
+from pandas import DataFrame
+
+from datasets import load_dataset, Dataset
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering, DefaultDataCollator, TrainingArguments, Trainer
 
 import torch
@@ -9,21 +12,38 @@ import torch
 from debiasing_methods.confidenceRegularization.overrides.loss import SmoothedDistillLoss
 from debiasing_methods.confidenceRegularization.overrides.models import *
 from debiasing_methods.confidenceRegularization.overrides.trainers import DistillerTrainer
-from debiasing_methods.confidenceRegularization.utils import prepare_train_features
+from debiasing_methods.confidenceRegularization.utils import prepare_train_features, get_preds_filename
 
 dirname = os.getcwd()
 
-def choose_distill_model(model_name: str, loss_fn: ClfDistillLossFunction):
 
+def choose_distill_model(model_name: str, loss_fn: ClfDistillLossFunction):
     match model_name:
         case 'bert-base-uncased':
             model = DistillBertForQuestionAnswering.from_pretrained(model_name, loss_fn=loss_fn)
-        case ['roberta-base','roberta-large']:
+        case ['roberta-base', 'roberta-large']:
             model = DistillRobertaForQuestionAnswering.from_pretrained(model_name, loss_fn=loss_fn)
         case 'electra-base-discriminator':
             model = DistillElectraForQuestionAnswering.from_pretrained(model_name, loss_fn=loss_fn)
 
     return model
+
+
+def load_distill_preds(args, load_biased: bool):
+    filename = get_preds_filename(args.model, args.bias, args.dataset, load_biased)
+    return pd.read_json(filename)
+
+
+def create_distill_dataset(train_dataset: Dataset, teacher_preds: DataFrame, bias_preds: DataFrame) -> Dataset:
+    """
+    Combine distillation examples (teacher_preds and bias_preds) into one dataset that can be fed through Trainer API
+    :param train_dataset: Dataset in HF format
+    :param teacher_preds: teacher predictions, DataFrame from JSON, loaded via load_distill_preds
+    :param bias_preds: predictions of biased model, DataFrame from JSON, loaded via load_distill_preds
+    :return Dataset
+    """
+    pass
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -33,6 +53,10 @@ def main():
                         help="Model to be debiased")
     parser.add_argument("--dataset", default="squad", type=str,
                         help="HuggingFace dataset name, e.g.: 'squad'")
+    parser.add_argument("--bias", default="distances", type=str,
+                        help="On which bias to train model. Supports all biases of 'isbiased' lib. "
+                             "Possible values: 'similar_words','distances','kth_sentence','cosine_similarity',"
+                             "'answer_length','max_sim_ents','answer_subject_positions'")
     parser.add_argument("--output_dir",
                         default="./results",
                         type=str,
@@ -95,7 +119,6 @@ def main():
 
     args = parser.parse_args()
 
-
     print("Training script started!")
 
     no_cuda = args.no_cuda
@@ -114,26 +137,26 @@ def main():
     distilled_model = choose_distill_model(args.model, loss_fn)
     distilled_model.to(device)
 
-
     # load teacher predictions and biased predictions
     dataset = load_dataset(args.dataset)
     tokenized_squad = dataset.map(prepare_train_features, batched=True, remove_columns=dataset["train"].column_names,
-                                  fn_kwargs={'tokenizer': tokenizer, 'args':args})
+                                  fn_kwargs={'tokenizer': tokenizer, 'args': args})
     print("Got dataset...")
     data_collator = DefaultDataCollator()
 
     training_args = TrainingArguments(
         output_dir=model_save_path,
         evaluation_strategy="epoch",
-        learning_rate=2e-5,
-        per_device_train_batch_size=16,
-        per_device_eval_batch_size=16,
-        num_train_epochs=3,
+        learning_rate=args.learning_rate,
+        per_device_train_batch_size=args.train_batch_size,
+        per_device_eval_batch_size=args.eval_batch_size,
+        num_train_epochs=args.num_train_epochs,
         weight_decay=0.01,
     )
 
     # TODO - not working now!
     # need to override Trainer, because of distillation - model's loss function needs input of teacher_preds and biased_preds
+    # MAYBE POSSIBLE TO COMBINE PREDICTIONS INTO ONE TRAIN DATASET - create_distill_dataset
     trainer = DistillerTrainer(
         model=distilled_model,
         args=training_args,
@@ -157,5 +180,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
