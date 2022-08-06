@@ -9,7 +9,8 @@ import torch
 
 import pandas as pd
 
-from debiasing_methods.confidenceRegularization.utils import prepare_train_features
+from debiasing_methods.confidenceRegularization.utils import prepare_train_features, get_model_filename, \
+    get_preds_filename
 
 from isbiased.bias_significance import BiasSignificanceMeasure
 
@@ -123,7 +124,8 @@ def main():
     print("Device:  ", device)
 
     model = args.model
-    biased_checkpoint = model + "-biased-" + args.bias
+    # biased_checkpoint = model + "-biased-" + args.bias
+    biased_checkpoint = get_model_filename(model,args.bias,args.dataset, True)
     print("Model:   ", model)
     model_save_path = os.path.join(dirname, 'saved_models', biased_checkpoint)
 
@@ -177,7 +179,7 @@ def main():
             per_device_train_batch_size=args.train_batch_size,
             gradient_accumulation_steps=args.gradient_accumulation_steps,
             per_device_eval_batch_size=args.train_batch_size,
-            # max_steps=2,  # for testing
+            max_steps=2,  # for testing
             num_train_epochs=args.num_train_epochs,
             warmup_ratio=args.warmup_proportion,
             weight_decay=0.01,
@@ -217,7 +219,7 @@ def main():
     )
 
     # prediction of whole dataset - predictions of BIASED model (trained on biased examples)
-    predictions, label_ids, metrics = trainer.predict(test_dataset=tokenized_dataset_train)
+    predictions, label_ids, metrics = trainer.predict(test_dataset=tokenized_dataset_train['train'].select(range(100)))
     # predictions contain outputs of net for all examples shape:
     #       2(as for start_logits and end_logits) * num_examples(dataset size) * num_outputs(output dimension of net)
     #           first row of shape is start_logits, second row is end_logits
@@ -225,7 +227,8 @@ def main():
     data = pd.DataFrame()
     data['start_logits'] = pd.Series(predictions[0].tolist())
     data['end_logits'] = pd.Series(predictions[1].tolist())
-    predictions_path = os.path.join(args.preds_dir, "biased_preds" + "_" + biased_checkpoint + "_" + args.dataset +".json")
+    # predictions_path = os.path.join(args.preds_dir, "biased_preds" + "_" + biased_checkpoint + "_" + args.dataset +".json")
+    predictions_path = os.path.join(args.preds_dir, get_preds_filename(args.model, args.bias, args.dataset,True))
     data.to_json(predictions_path)
 
     print(f"Knowledge distillation completed! 👌 \n"

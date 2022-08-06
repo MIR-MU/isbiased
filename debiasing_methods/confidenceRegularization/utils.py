@@ -1,3 +1,6 @@
+import os
+
+
 def prepare_train_features(examples, tokenizer,args):
     # Some of the questions have lots of whitespace on the left, which is not useful and will make the
     # truncation of the context fail (the tokenized question will take a lots of space). So we remove that
@@ -78,3 +81,17 @@ def prepare_train_features(examples, tokenizer,args):
                 tokenized_examples["end_positions"].append(token_end_index + 1)
 
     return tokenized_examples
+
+
+def get_model_filename(model_name:str, bias_name:str, dataset_name:str,is_biased:bool):
+    if not is_biased:
+        return "teacher_"+model_name + "_" + dataset_name
+
+    return "biased_" + model_name + "_" + bias_name + "_" + dataset_name
+
+
+def get_preds_filename(model_name:str, bias_name: str, dataset_name:str, is_biased:bool):
+    if not is_biased:
+        return "teacher-preds_" + os.path.basename(model_name) + "_" + dataset_name + ".json"
+
+    return "biased-preds_" + model_name + "_" + bias_name + "_" + dataset_name + ".json"

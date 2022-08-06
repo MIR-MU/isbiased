@@ -9,7 +9,7 @@ import torch
 
 import pandas as pd
 
-from debiasing_methods.confidenceRegularization.utils import prepare_train_features
+from debiasing_methods.confidenceRegularization.utils import prepare_train_features, get_preds_filename
 
 dirname = os.getcwd()
 
@@ -96,6 +96,7 @@ def main():
     print("Model:   ", model_checkpoint)
     model_save_path = os.path.join(dirname, 'saved_models', model_checkpoint)
 
+    # tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
     tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
     model = AutoModelForQuestionAnswering.from_pretrained(model_checkpoint)
     model.to(device)
@@ -147,7 +148,7 @@ def main():
     training_args = TrainingArguments(
         output_dir=model_save_path,
         per_device_eval_batch_size=args.eval_batch_size,
-        # max_steps=2,  # for testing
+        max_steps=2,  # for testing
         disable_tqdm=False
     )
 
@@ -158,7 +159,7 @@ def main():
         data_collator=data_collator,
     )
 
-    predictions, label_ids, metrics = trainer.predict(test_dataset=tokenized_squad['train'])
+    predictions, label_ids, metrics = trainer.predict(test_dataset=tokenized_squad['train'].select(range(100)))
     # predictions contain outputs of net for all examples shape:
     #       2(as for start_logits and end_logits) * num_examples(dataset size) * num_outputs(output dimension of net)
     #           first row of shape is start_logits, second row is end_logits
@@ -166,7 +167,8 @@ def main():
     data = pd.DataFrame()
     data['start_logits'] = pd.Series(predictions[0].tolist())
     data['end_logits'] = pd.Series(predictions[1].tolist())
-    predictions_path = os.path.join(args.preds_dir,"teacher_preds" + "_" + os.path.basename(model.name_or_path)+"_"+args.dataset +".json")
+    # predictions_path = os.path.join(args.preds_dir,"teacher_preds" + "_" + os.path.basename(model.name_or_path)+"_"+args.dataset +".json")
+    predictions_path = get_preds_filename(os.path.basename(model.name_or_path),"",args.dataset,False)
     data.to_json(predictions_path)
 
     print(f"Knowledge distillation completed! 👌 \n"
