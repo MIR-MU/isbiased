@@ -62,7 +62,7 @@ non_biased_objective = ExtractiveQA(lang_module,
                                val_text_pair_or_path=unbiasedDataset["context"][:num_val_samples],
                                val_labels_or_path=[a["text"][0] for a in unbiasedDataset["answers"]][:num_val_samples],
                                batch_size=3,
-                               val_evaluators=F1ScoreForQA(),
+                               val_evaluators=[F1ScoreForQA()],
                                objective_id="SQUAD-en-non-biased")
 # end: bias logging
 
