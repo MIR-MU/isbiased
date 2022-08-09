@@ -29,6 +29,20 @@ biased_model = AutoModelForQuestionAnswering.from_pretrained(biased_model_path).
 squad_en = load_dataset("squad")
 squad_train = squad_en["train"].filter(lambda entry: len(entry["context"]) < 2000)
 
+
+mixin_objective = LearnedMixinH(lang_module,
+                                biased_model=biased_model,
+                                device="cuda",
+                                texts_or_path=squad_train["question"],
+                                text_pair_or_path=squad_train["context"],
+                                labels_or_path=[a["text"][0] for a in squad_train["answers"]],
+                                val_texts_or_path=squad_en["validation"]["question"][:num_val_samples],
+                                val_text_pair_or_path=squad_en["validation"]["context"][:num_val_samples],
+                                val_labels_or_path=[a["text"][0] for a in squad_en["validation"]["answers"]][:num_val_samples],
+                                batch_size=3,
+                                val_evaluators=[F1ScoreForQA()],
+                                objective_id="SQUAD-en")
+
 # bias logging:
 full_dataset_model_path = "/mnt/local/disk1/klasifikace_reflexe/think_twice/isbiased/models/roberta-base-orig"
 # full_dataset_model_path = "../models/electra-base-discriminator-finetuned-squad_with_callbacks_baseline"
@@ -44,52 +58,42 @@ measurer.compute_heuristic(bias_id)
 biasedDataset, unbiasedDataset = measurer.split_data_by_heuristics(squad_en['train'], bias_id)
 
 biased_objective = ExtractiveQA(lang_module,
-                               texts_or_path=biasedDataset["question"],
-                               text_pair_or_path=biasedDataset["context"],
-                               labels_or_path=[a["text"][0] for a in biasedDataset["answers"]],
-                               val_texts_or_path=biasedDataset["question"][:num_val_samples],
-                               val_text_pair_or_path=biasedDataset["context"][:num_val_samples],
-                               val_labels_or_path=[a["text"][0] for a in biasedDataset["answers"]][:num_val_samples],
-                               batch_size=3,
-                               val_evaluators=[F1ScoreForQA()],
-                               objective_id="SQUAD-en-biased")
+                                texts_or_path=biasedDataset["question"],
+                                text_pair_or_path=biasedDataset["context"],
+                                labels_or_path=[a["text"][0] for a in biasedDataset["answers"]],
+                                val_texts_or_path=biasedDataset["question"][:num_val_samples],
+                                val_text_pair_or_path=biasedDataset["context"][:num_val_samples],
+                                val_labels_or_path=[a["text"][0] for a in biasedDataset["answers"]][:num_val_samples],
+                                batch_size=3,
+                                val_evaluators=[F1ScoreForQA()],
+                                objective_id="SQUAD-en-biased",
+                                share_other_objective_head=mixin_objective)
 
 non_biased_objective = ExtractiveQA(lang_module,
-                               texts_or_path=unbiasedDataset["question"],
-                               text_pair_or_path=unbiasedDataset["context"],
-                               labels_or_path=[a["text"][0] for a in unbiasedDataset["answers"]],
-                               val_texts_or_path=unbiasedDataset["question"][:num_val_samples],
-                               val_text_pair_or_path=unbiasedDataset["context"][:num_val_samples],
-                               val_labels_or_path=[a["text"][0] for a in unbiasedDataset["answers"]][:num_val_samples],
-                               batch_size=3,
-                               val_evaluators=[F1ScoreForQA()],
-                               objective_id="SQUAD-en-non-biased")
+                                    texts_or_path=unbiasedDataset["question"],
+                                    text_pair_or_path=unbiasedDataset["context"],
+                                    labels_or_path=[a["text"][0] for a in unbiasedDataset["answers"]],
+                                    val_texts_or_path=unbiasedDataset["question"][:num_val_samples],
+                                    val_text_pair_or_path=unbiasedDataset["context"][:num_val_samples],
+                                    val_labels_or_path=[a["text"][0] for a in unbiasedDataset["answers"]][:num_val_samples],
+                                    batch_size=3,
+                                    val_evaluators=[F1ScoreForQA()],
+                                    objective_id="SQUAD-en-non-biased",
+                                    share_other_objective_head=mixin_objective)
 # end: bias logging
-
-
-mixin_objective = LearnedMixinH(lang_module,
-                                biased_model=biased_model,
-                                texts_or_path=squad_train["question"],
-                                text_pair_or_path=squad_train["context"],
-                                labels_or_path=[a["text"][0] for a in squad_train["answers"]],
-                                val_texts_or_path=squad_en["validation"]["question"][:num_val_samples],
-                                val_text_pair_or_path=squad_en["validation"]["context"][:num_val_samples],
-                                val_labels_or_path=[a["text"][0] for a in squad_en["validation"]["answers"]][:num_val_samples],
-                                batch_size=3,
-                                val_evaluators=[F1ScoreForQA(decides_convergence=True)],
-                                objective_id="SQUAD-en")
 
 training_arguments = AdaptationArguments(output_dir="checkpoint_dir",
                                          learning_rate=4e-5,
-                                         stopping_strategy=StoppingStrategy.ALL_OBJECTIVES_CONVERGED,
+                                         stopping_strategy=StoppingStrategy.ALL_OBJECTIVES_NUM_EPOCHS,
                                          do_train=True,
                                          do_eval=True,
                                          warmup_steps=1000,
                                          max_steps=100000,
                                          gradient_accumulation_steps=5,
-                                         eval_steps=100,
+                                         eval_steps=00,
                                          logging_steps=100,
                                          save_steps=1000,
+                                         # stopping_patience=100,
                                          num_train_epochs=30,
                                          evaluation_strategy="steps")
 
