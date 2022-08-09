@@ -19,7 +19,8 @@ class LearnedMixinH(ExtractiveQA):
         logger.warning("We have no way to check that given biased_model is really for QA :/ Be sure to pass QA model.")
         self.compatible_head_model.config.output_hidden_states = True  # we fit bias scalar on the model hidden states
 
-        self.biased_model = biased_model
+        # devices of all modules are to be set according to the compatible_head_model's device
+        self.biased_model = biased_model.to(self.compatible_head_model.device)
         self.penalty = penalty
 
         self.learned_bias_scalar = torch.nn.Linear(in_features=2 * self.compatible_head_model.config.hidden_size,
@@ -48,7 +49,8 @@ class LearnedMixinH(ExtractiveQA):
         start_hidden = model_outputs.hidden_states[-1][torch.arange(0, labels.shape[0]), start_lprobs.argmax(-1)]
         end_hidden = model_outputs.hidden_states[-1][torch.arange(0, labels.shape[0]), end_lprobs.argmax(-1)]
 
-        bias_scale = self.learned_bias_scalar.forward(torch.hstack([start_hidden, end_hidden]))
+        bias_scale = self.learned_bias_scalar(torch.hstack([start_hidden,
+                                                            end_hidden]).to(self.compatible_head_model.device))
         bias_scale = F.softplus(bias_scale)
 
         biased_start_logits = biased_start_logits * bias_scale
