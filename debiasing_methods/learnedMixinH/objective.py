@@ -40,8 +40,12 @@ class LearnedMixinH(ExtractiveQA):
                       labels: torch.LongTensor,
                       inputs: Optional[Union[BatchEncoding, Dict[str, torch.Tensor]]] = None,
                       attention_mask: Optional[torch.LongTensor] = None) -> torch.FloatTensor:
+        # implemented according to https://github.com/chrisc36/debias:
+        # 1. debias.bert.clf_debias_loss_functions.LearnedMixin.forward()
+        # 2. debias.modules.qa_debias_loss_functions.LearnedMixin.compute_qa_loss()
 
-        biased_start_logits, biased_end_logits = self._bias_prediction(inputs)
+        with torch.no_grad():
+            biased_start_logits, biased_end_logits = self._bias_prediction(inputs)
 
         start_lprobs = model_outputs.start_logits.log_softmax(1)
         end_lprobs = model_outputs.end_logits.log_softmax(1)
@@ -62,8 +66,8 @@ class LearnedMixinH(ExtractiveQA):
 
         # TODO check: summing up trained logPROBS with bias LOGITS! Different scaling, but consistent with original git.
         # though inconsistent with the paper (https://aclanthology.org/D19-1418.pdf Sec. 3.2.4)
-        start_loss = cross_entropy_loss(start_lprobs + biased_start_logits, inputs["start_position"])
-        end_loss = cross_entropy_loss(end_lprobs + biased_end_logits, inputs["end_position"])
+        start_loss = cross_entropy_loss(model_outputs.start_logits + biased_start_logits, inputs["start_position"])
+        end_loss = cross_entropy_loss(model_outputs.end_logits + biased_end_logits, inputs["end_position"])
 
         total_loss = (start_loss + end_loss) / 2
 
