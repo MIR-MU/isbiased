@@ -33,10 +33,10 @@ full_dataset_model_path = "../models/electra-base-discriminator-finetuned-squad_
 measurer = BiasSignificanceMeasure()
 # measurer = BiasSignificanceMeasure(squad_en['train'])
 # we need already-trained model for this
-measurer.evaluate_model_on_dataset(full_dataset_model_path, squad_en['train'].select(range(2000)))
+metrics, dataset = measurer.evaluate_model_on_dataset(full_dataset_model_path, squad_en['train'].select(range(2000)))
 # measurer.evaluate_model_on_dataset(full_dataset_model_path, squad_en['validation'])
 
-biasedDataset, unbiasedDataset = measurer.split_data_by_heuristics(squad_en['validation'].select(range(2000)),
+biasedDataset, unbiasedDataset = measurer.split_data_by_heuristics(dataset,
                                                                    squad_en['train'].select(range(2000)),
                                                                    bias_id)
 
