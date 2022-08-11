@@ -51,11 +51,9 @@ full_dataset_model_path = "/mnt/local/disk1/klasifikace_reflexe/think_twice/isbi
 measurer = BiasSignificanceMeasure(squad_en['train'])
 # we need already-trained model for this
 # measurer.evaluate_model_on_dataset(full_dataset_model_path, squad_en['validation'].select(range(2000)))
-measurer.evaluate_model_on_dataset(full_dataset_model_path, squad_en['validation'])
+metrics, dataset = measurer.evaluate_model_on_dataset(full_dataset_model_path, squad_en['train'])
 
-measurer.compute_heuristic(bias_id)
-
-biasedDataset, unbiasedDataset = measurer.split_data_by_heuristics(squad_en['train'], bias_id)
+biasedDataset, unbiasedDataset = measurer.split_data_by_heuristics(dataset, squad_en['train'], bias_id)
 
 biased_objective = ExtractiveQA(lang_module,
                                 texts_or_path=biasedDataset["question"],
@@ -90,7 +88,7 @@ training_arguments = AdaptationArguments(output_dir="checkpoint_dir",
                                          warmup_steps=1000,
                                          max_steps=100000,
                                          gradient_accumulation_steps=5,
-                                         eval_steps=00,
+                                         eval_steps=100,
                                          logging_steps=100,
                                          save_steps=1000,
                                          # stopping_patience=100,
