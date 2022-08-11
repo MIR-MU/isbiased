@@ -15,7 +15,7 @@ biased_model_id = "bert-base-cased"
 # local:
 # biased_model_id = "bert-base-multilingual-cased"
 
-bias_id = "similar_words"
+bias_id = "distances"
 
 # fixed env-specific parameters
 full_dataset_model_path = "/mnt/local/disk1/klasifikace_reflexe/think_twice/isbiased/models/roberta-base-orig"
@@ -30,14 +30,11 @@ squad_en = load_dataset("squad")
 measurer = BiasSignificanceMeasure(squad_en['train'])
 # we need already-trained model for this
 # measurer.evaluate_model_on_dataset(full_dataset_model_path, squad_en['validation'].select(range(2000)))
-measurer.evaluate_model_on_dataset(full_dataset_model_path, squad_en['validation'])
+metrics, dataset = measurer.evaluate_model_on_dataset(full_dataset_model_path, squad_en['train'])
 
 # end: parameters
 
-
-measurer.compute_heuristic(bias_id)
-
-biasedDataset, unbiasedDataset = measurer.split_data_by_heuristics(squad_en['train'], bias_id)
+biasedDataset, unbiasedDataset = measurer.split_data_by_heuristics(dataset, squad_en['train'], bias_id)
 
 squad_train_biased = biasedDataset.filter(lambda entry: len(entry["context"]) < 2000)
 
@@ -46,7 +43,7 @@ lang_module = LangModule(biased_model_id)
 
 training_arguments = AdaptationArguments(output_dir="train_dir-%s-%s" % (bias_id, biased_model_id),
                                          learning_rate=4e-5,
-                                         stopping_strategy=StoppingStrategy.ALL_OBJECTIVES_CONVERGED,
+                                         stopping_strategy=StoppingStrategy.ALL_OBJECTIVES_NUM_STEPS,
                                          do_train=True,
                                          do_eval=True,
                                          warmup_steps=1000,
@@ -57,7 +54,7 @@ training_arguments = AdaptationArguments(output_dir="train_dir-%s-%s" % (bias_id
                                          save_steps=1000,
                                          num_train_epochs=30,
                                          evaluation_strategy="steps",
-                                         stopping_patience=20)
+                                         stopping_patience=200)
 
 val_metrics = [F1ScoreForQA(decides_convergence=True)]
 
@@ -72,7 +69,32 @@ mixin_objective = ExtractiveQA(lang_module,
                                val_evaluators=val_metrics,
                                objective_id="SQUAD-en-biased")
 
+biased_objective = ExtractiveQA(lang_module,
+                                texts_or_path=biasedDataset["question"],
+                                text_pair_or_path=biasedDataset["context"],
+                                labels_or_path=[a["text"][0] for a in biasedDataset["answers"]],
+                                val_texts_or_path=biasedDataset["question"][:num_val_samples],
+                                val_text_pair_or_path=biasedDataset["context"][:num_val_samples],
+                                val_labels_or_path=[a["text"][0] for a in biasedDataset["answers"]][:num_val_samples],
+                                batch_size=3,
+                                val_evaluators=[F1ScoreForQA()],
+                                objective_id="SQUAD-en-biased",
+                                share_other_objective_head=mixin_objective)
+
+non_biased_objective = ExtractiveQA(lang_module,
+                                    texts_or_path=unbiasedDataset["question"],
+                                    text_pair_or_path=unbiasedDataset["context"],
+                                    labels_or_path=[a["text"][0] for a in unbiasedDataset["answers"]],
+                                    val_texts_or_path=unbiasedDataset["question"][:num_val_samples],
+                                    val_text_pair_or_path=unbiasedDataset["context"][:num_val_samples],
+                                    val_labels_or_path=[a["text"][0] for a in unbiasedDataset["answers"]][:num_val_samples],
+                                    batch_size=3,
+                                    val_evaluators=[F1ScoreForQA()],
+                                    objective_id="SQUAD-en-non-biased",
+                                    share_other_objective_head=mixin_objective)
+
 schedule = ParallelSchedule(objectives=[mixin_objective],
+                            extra_eval_objectives=[biased_objective, non_biased_objective],
                             args=training_arguments)
 
 adapter = Adapter(lang_module, schedule, args=training_arguments)
