@@ -323,7 +323,7 @@ class BiasSignificanceMeasure:
         # with original comments
         def postprocess_qa_predictions(examples: Dataset, features: Dataset,
                                        raw_predictions: Tuple[List[float], List[float]], n_best_size: int = 20,
-                                       max_answer_length: int = 30) -> collections.OrderedDict[str, str]:
+                                       max_answer_length: int = 30) -> Dict[str, str]:
             """Postprocessing of predictions of the QA model
 
             Args:
