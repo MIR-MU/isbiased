@@ -81,7 +81,7 @@ non_biased_objective = ExtractiveQA(lang_module,
 # end: bias logging
 
 training_arguments = AdaptationArguments(output_dir="checkpoint_dir",
-                                         learning_rate=4e-5,
+                                         learning_rate=2e-4,
                                          stopping_strategy=StoppingStrategy.ALL_OBJECTIVES_NUM_EPOCHS,
                                          do_train=True,
                                          do_eval=True,
