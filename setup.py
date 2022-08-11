@@ -41,6 +41,7 @@ setup(
         "spacy",
         "torch==1.11.0",
         "transformers==4.19.1",
+        "dill<0.3.5",
     ],
     test_require=[
         "pytest"
