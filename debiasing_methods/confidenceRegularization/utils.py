@@ -1,5 +1,9 @@
 import os
 
+dirname = os.getcwd()
+datasets_dir = 'dataset'
+models_dir = 'saved_models'
+
 
 def prepare_train_features(examples, tokenizer,args):
     # Some of the questions have lots of whitespace on the left, which is not useful and will make the
@@ -95,3 +99,9 @@ def get_preds_filename(model_name:str, bias_name: str, dataset_name:str, is_bias
         return "teacher-preds_" + os.path.basename(model_name) + "_" + dataset_name + ".json"
 
     return "biased-preds_" + model_name + "_" + bias_name + "_" + dataset_name + ".json"
+
+def get_dataset_path(filename:str):
+    return os.path.join(dirname,datasets_dir,filename)
+
+def get_model_path(filename:str):
+    return os.path.join(dirname,models_dir,filename)
