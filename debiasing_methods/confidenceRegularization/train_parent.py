@@ -9,7 +9,8 @@ import torch
 
 import pandas as pd
 
-from debiasing_methods.confidenceRegularization.utils import prepare_train_features, get_preds_filename
+from debiasing_methods.confidenceRegularization.utils import prepare_train_features, get_preds_filename, \
+    get_dataset_path
 
 dirname = os.getcwd()
 
@@ -168,7 +169,7 @@ def main():
     data['start_logits'] = pd.Series(predictions[0].tolist())
     data['end_logits'] = pd.Series(predictions[1].tolist())
     # predictions_path = os.path.join(args.preds_dir,"teacher_preds" + "_" + os.path.basename(model.name_or_path)+"_"+args.dataset +".json")
-    predictions_path = get_preds_filename(os.path.basename(model.name_or_path),"",args.dataset,False)
+    predictions_path = get_dataset_path(get_preds_filename(os.path.basename(model.name_or_path),"",args.dataset,False))
     data.to_json(predictions_path)
 
     print(f"Knowledge distillation completed! 👌 \n"

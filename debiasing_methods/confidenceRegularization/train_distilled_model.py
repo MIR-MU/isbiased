@@ -12,26 +12,27 @@ import torch
 from debiasing_methods.confidenceRegularization.overrides.loss import SmoothedDistillLoss
 from debiasing_methods.confidenceRegularization.overrides.models import *
 from debiasing_methods.confidenceRegularization.overrides.trainers import DistillerTrainer
-from debiasing_methods.confidenceRegularization.utils import prepare_train_features, get_preds_filename
+from debiasing_methods.confidenceRegularization.utils import *
 
 dirname = os.getcwd()
 
 
 def choose_distill_model(model_name: str, loss_fn: ClfDistillLossFunction):
-    match model_name:
-        case 'bert-base-uncased':
-            model = DistillBertForQuestionAnswering.from_pretrained(model_name, loss_fn=loss_fn)
-        case ['roberta-base', 'roberta-large']:
-            model = DistillRobertaForQuestionAnswering.from_pretrained(model_name, loss_fn=loss_fn)
-        case 'electra-base-discriminator':
-            model = DistillElectraForQuestionAnswering.from_pretrained(model_name, loss_fn=loss_fn)
+    if model_name == 'bert-base-uncased':
+        model = DistillBertForQuestionAnswering.from_pretrained(model_name, loss_fn=loss_fn)
+    elif model_name in ['roberta-base', 'roberta-large']:
+        model = DistillRobertaForQuestionAnswering.from_pretrained(model_name, loss_fn=loss_fn)
+    elif model_name == 'electra-base-discriminator':
+        model = DistillElectraForQuestionAnswering.from_pretrained(model_name, loss_fn=loss_fn)
 
     return model
 
 
 def load_distill_preds(args, load_biased: bool):
     filename = get_preds_filename(args.model, args.bias, args.dataset, load_biased)
-    return pd.read_json(filename)
+    print(filename)
+    print(get_dataset_path(filename))
+    return pd.read_json(get_dataset_path(filename))
 
 
 def create_distill_dataset(train_dataset: Dataset, teacher_preds: DataFrame, bias_preds: DataFrame) -> Dataset:
@@ -42,6 +43,11 @@ def create_distill_dataset(train_dataset: Dataset, teacher_preds: DataFrame, bia
     :param bias_preds: predictions of biased model, DataFrame from JSON, loaded via load_distill_preds
     :return Dataset
     """
+
+
+    teacher_probs = teacher_preds['start_logits'] + teacher_preds['end_logits']
+    train_dataset.add_column('teacher_probs',teacher_probs)
+
     pass
 
 
@@ -139,10 +145,17 @@ def main():
 
     # load teacher predictions and biased predictions
     dataset = load_dataset(args.dataset)
+    dataset = dataset['validation'].train_test_split(train_size=0.6)
     tokenized_squad = dataset.map(prepare_train_features, batched=True, remove_columns=dataset["train"].column_names,
                                   fn_kwargs={'tokenizer': tokenizer, 'args': args})
     print("Got dataset...")
     data_collator = DefaultDataCollator()
+
+    # create distilled dataset here
+    # merge tokenized dataest with parent_preds, biased_preds
+    teacher_preds = load_distill_preds(args, False)
+    biased_preds = load_distill_preds(args, True)
+    distil_dataset = create_distill_dataset(tokenized_squad, teacher_preds, biased_preds)
 
     training_args = TrainingArguments(
         output_dir=model_save_path,
