@@ -58,10 +58,10 @@ def main():
                         default="./saved_models",
                         type=str,
                         help="The output directory where the model and checkpoints will be written.")
-    parser.add_argument("--preds_dir",
-                        default="./dataset",
-                        type=str,
-                        help="Directory to save model predictions to.")
+    # parser.add_argument("--preds_dir",
+    #                     default="./dataset",
+    #                     type=str,
+    #                     help="Directory to save model predictions to.")
     parser.add_argument("--max_seq_length",
                         default=384,
                         type=int,
@@ -228,7 +228,7 @@ def main():
     data['start_logits'] = pd.Series(predictions[0].tolist())
     data['end_logits'] = pd.Series(predictions[1].tolist())
     # predictions_path = os.path.join(args.preds_dir, "biased_preds" + "_" + biased_checkpoint + "_" + args.dataset +".json")
-    predictions_path = get_dataset_path(os.path.join(args.preds_dir, get_preds_filename(args.model, args.bias, args.dataset,True)))
+    predictions_path = get_dataset_path(get_preds_filename(args.model, args.bias, args.dataset,True))
     data.to_json(predictions_path)
 
     print(f"Knowledge distillation completed! 👌 \n"
