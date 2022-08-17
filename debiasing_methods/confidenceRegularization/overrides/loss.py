@@ -21,12 +21,12 @@ class ClfDistillLossFunction(nn.Module):
 
 
 class SmoothedDistillLoss(ClfDistillLossFunction):
-    def forward(self, hidden, logits, bias, teacher_probs, labels):
+    def forward(self, hidden, logits, bias_probs, teacher_probs, labels):
         softmaxf = torch.nn.Softmax(dim=1)
         probs = softmaxf(logits)
 
         one_hot_labels = torch.eye(logits.size(1)).cuda()[labels]
-        weights = (1 - (one_hot_labels * torch.exp(bias)).sum(1))
+        weights = (1 - (one_hot_labels * torch.exp(bias_probs)).sum(1))
         weights = weights.unsqueeze(1).expand_as(teacher_probs)
 
         exp_teacher_probs = teacher_probs ** weights

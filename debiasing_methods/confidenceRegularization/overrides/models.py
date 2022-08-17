@@ -67,8 +67,10 @@ class DistillBertForQuestionAnswering(BertPreTrainedModel):
             output_attentions: Optional[bool] = None,
             output_hidden_states: Optional[bool] = None,
             return_dict: Optional[bool] = None,
-            bias=None,
-            teacher_probs=None,
+            bias_probs_start=None,
+            bias_probs_end=None,
+            teacher_probs_start=None,
+            teacher_probs_end=None,
             labels = None,
     ) -> Union[Tuple[torch.Tensor], QuestionAnsweringModelOutput]:
         r"""
@@ -115,11 +117,15 @@ class DistillBertForQuestionAnswering(BertPreTrainedModel):
             end_positions = end_positions.clamp(0, ignored_index)
 
             # TODO - check meaning of ignore_index
-            loss_fct = self.loss_fn(ignore_index=ignored_index)
+            # loss_fct = self.loss_fn(ignore_index=ignored_index)
+            loss_fct = self.loss_fn
             # fixme
             # bias and teacher_preds have 2 dimensions = 0: start, 1:end
-            start_loss = loss_fct(start_logits, start_positions, bias, teacher_probs, labels)
-            end_loss = loss_fct(end_logits, end_positions, bias, teacher_probs, labels)
+            # start_loss = loss_fct(logits=start_logits, start_positions, bias_probs=bias_probs_start,
+                                  # teacher_probs=teacher_probs_start, labels=labels)
+            start_loss = loss_fct(logits=start_logits, bias_probs=bias_probs_start, teacher_probs=teacher_probs_start, labels=labels, hidden=None)
+            # end_loss = loss_fct(end_logits, end_positions, bias_probs, teacher_probs, labels)
+            end_loss = loss_fct(logits=end_logits, bias_probs=bias_probs_end, teacher_probs=teacher_probs_end, labels=labels, hidden=None)
             total_loss = (start_loss + end_loss) / 2
 
         if not return_dict:
@@ -163,7 +169,7 @@ class DistillRobertaForQuestionAnswering(RobertaPreTrainedModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
-        bias = None,
+        bias_probs = None,
         teacher_probs = None,
         labels=None,
     ) -> Union[Tuple[torch.Tensor], QuestionAnsweringModelOutput]:
@@ -211,11 +217,11 @@ class DistillRobertaForQuestionAnswering(RobertaPreTrainedModel):
             end_positions = end_positions.clamp(0, ignored_index)
 
             # TODO check meaning of ignore_index
-            loss_fct = self.loss_fn(ignore_index=ignored_index)
+            loss_fct = self.loss_fn()
             # fixme
             # bias and teacher_preds have 2 dimensions = 0: start, 1:end
-            start_loss = loss_fct(start_logits, start_positions, bias, teacher_probs, labels)
-            end_loss = loss_fct(end_logits, end_positions, bias, teacher_probs, labels)
+            start_loss = loss_fct(start_logits, start_positions, bias_probs, teacher_probs, labels)
+            end_loss = loss_fct(end_logits, end_positions, bias_probs, teacher_probs, labels)
             total_loss = (start_loss + end_loss) / 2
 
         if not return_dict:
@@ -260,7 +266,7 @@ class DistillElectraForQuestionAnswering(ElectraPreTrainedModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
-        bias=None,
+        bias_probs=None,
         teacher_probs=None,
         labels=None,
     ) -> Union[Tuple[torch.Tensor], QuestionAnsweringModelOutput]:
@@ -306,12 +312,12 @@ class DistillElectraForQuestionAnswering(ElectraPreTrainedModel):
             start_positions = start_positions.clamp(0, ignored_index)
             end_positions = end_positions.clamp(0, ignored_index)
 
-            loss_fct = self.loss_fn(ignore_index=ignored_index)
+            loss_fct = self.loss_fn()
 
             # fixme
             # bias and teacher_preds have 2 dimensions = 0: start, 1:end
-            start_loss = loss_fct(start_logits, start_positions, bias, teacher_probs, labels)
-            end_loss = loss_fct(end_logits, end_positions, bias, teacher_probs, labels)
+            start_loss = loss_fct(start_logits, start_positions, bias_probs, teacher_probs, labels)
+            end_loss = loss_fct(end_logits, end_positions, bias_probs, teacher_probs, labels)
             total_loss = (start_loss + end_loss) / 2
 
         if not return_dict:

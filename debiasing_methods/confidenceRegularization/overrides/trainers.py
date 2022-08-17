@@ -26,17 +26,57 @@ class DistillerTrainer(Trainer):
             optimizers: Tuple[torch.optim.Optimizer, torch.optim.lr_scheduler.LambdaLR] = (None, None),
             preprocess_logits_for_metrics: Callable[[torch.Tensor, torch.Tensor], torch.Tensor] = None,
     ):
-        super(Trainer, self).__init__(model=model,
-                                      args=args,
-                                      data_collator=data_collator,
-                                      train_dataset=train_dataset,
-                                      eval_dataset=eval_dataset,
-                                      tokenizer=tokenizer,
-                                      model_init=model_init,
-                                      compute_metrics=compute_metrics,
-                                      callbacks=callbacks,
-                                      optimizers=optimizers,
-                                      preprocess_logits_for_metrics=preprocess_logits_for_metrics, )
-
         self.teacher_predictions = teacher_predictions
         self.biased_predictions = biased_predictions
+
+        super().__init__(
+            model= model,
+            args= args,
+            data_collator= data_collator,
+            train_dataset= train_dataset,
+            eval_dataset= eval_dataset,
+            tokenizer= tokenizer,
+            model_init= model_init,
+            compute_metrics= compute_metrics,
+            callbacks= callbacks,
+            optimizers= optimizers,
+            preprocess_logits_for_metrics= preprocess_logits_for_metrics,)
+
+        # super(Trainer, self).__init__(self,model=model,
+        #                               args=args,
+        #                               data_collator=data_collator,
+        #                               train_dataset=train_dataset,
+        #                               eval_dataset=eval_dataset,
+        #                               tokenizer=tokenizer,
+        #                               model_init=model_init,
+        #                               compute_metrics=compute_metrics,
+        #                               callbacks=callbacks,
+        #                               optimizers=optimizers,
+        #                               preprocess_logits_for_metrics=preprocess_logits_for_metrics, )
+
+
+
+
+    def compute_loss(self, model, inputs, return_outputs=False):
+        """
+        How the loss is computed by Trainer. By default, all models return the loss in the first element.
+
+        Subclass and override for custom behavior.
+        """
+        if self.label_smoother is not None and "labels" in inputs:
+            labels = inputs.pop("labels")
+        else:
+            labels = None
+        outputs = model(**inputs)
+        # Save past state if it exists
+        # TODO: this needs to be fixed and made cleaner later.
+        if self.args.past_index >= 0:
+            self._past = outputs[self.args.past_index]
+
+        if labels is not None:
+            loss = self.label_smoother(outputs, labels)
+        else:
+            # We don't use .loss here since the model may return tuples instead of ModelOutput.
+            loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
+
+        return (loss, outputs) if return_outputs else loss

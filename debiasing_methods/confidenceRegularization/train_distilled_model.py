@@ -45,10 +45,35 @@ def create_distill_dataset(train_dataset: Dataset, teacher_preds: DataFrame, bia
     """
 
 
-    teacher_probs = teacher_preds['start_logits'] + teacher_preds['end_logits']
-    train_dataset.add_column('teacher_probs',teacher_probs)
 
-    pass
+    teacher_probs = teacher_preds['start_logits'] + teacher_preds['end_logits']
+    if len(train_dataset['train']) + len(train_dataset['validation']) != len(teacher_probs):
+        raise RuntimeError(f"Length of train_dataset is " +
+                            f"{len(train_dataset['train']) + len(train_dataset['validation'])}, " +
+                            f"but length of teacher_probs is {len(teacher_probs)} and should be equal")
+
+    bias_probs = bias_preds['start_logits'] + bias_preds['end_logits']
+    if len(train_dataset['train']) + len(train_dataset['validation']) != len(bias_probs):
+        raise RuntimeError(f"Length of train_dataset is " +
+                            f"{len(train_dataset['train']) + len(train_dataset['validation'])}, " +
+                            f"but length of teacher_probs is {len(teacher_probs)} and should be equal")
+
+
+    train_len = len(train_dataset['train'])
+    valid_len = len(train_dataset['validation'])
+
+
+    train_dataset['train'] = train_dataset['train'].add_column('teacher_probs_start',teacher_preds['start_logits'][:train_len])
+    train_dataset['train'] = train_dataset['train'].add_column('teacher_probs_end', teacher_preds['end_logits'][:train_len])
+    train_dataset['train'] = train_dataset['train'].add_column('bias_probs_start',bias_preds['start_logits'][:train_len])
+    train_dataset['train'] = train_dataset['train'].add_column('bias_probs_end',bias_preds['end_logits'][:train_len])
+
+    train_dataset['validation'] = train_dataset['validation'].add_column('teacher_probs_start', teacher_preds['start_logits'][train_len:train_len+valid_len])
+    train_dataset['validation'] = train_dataset['validation'].add_column('teacher_probs_end', teacher_preds['end_logits'][train_len:train_len+valid_len])
+    train_dataset['validation'] = train_dataset['validation'].add_column('bias_probs_start', bias_preds['start_logits'][train_len:train_len+valid_len])
+    train_dataset['validation'] = train_dataset['validation'].add_column('bias_probs_end', bias_preds['end_logits'][train_len:train_len+valid_len])
+
+    return train_dataset
 
 
 def main():
@@ -145,9 +170,19 @@ def main():
 
     # load teacher predictions and biased predictions
     dataset = load_dataset(args.dataset)
-    dataset = dataset['validation'].train_test_split(train_size=0.6)
+    ### for testing
+    dataset = dataset['validation'].train_test_split(train_size=100)
+    dataset = dataset['train'].train_test_split(train_size=0.8)
+    dataset['validation'] = dataset['test']
+    del dataset['test']
+    ###
     tokenized_squad = dataset.map(prepare_train_features, batched=True, remove_columns=dataset["train"].column_names,
                                   fn_kwargs={'tokenizer': tokenizer, 'args': args})
+    ### for testing
+    tokenized_squad['train'] = tokenized_squad['train'].select(range(80))
+    tokenized_squad['validation'] = tokenized_squad['validation'].select(range(20))
+    ###
+
     print("Got dataset...")
     data_collator = DefaultDataCollator()
 
@@ -173,8 +208,8 @@ def main():
     trainer = DistillerTrainer(
         model=distilled_model,
         args=training_args,
-        train_dataset=tokenized_squad["train"],
-        eval_dataset=tokenized_squad["validation"],
+        train_dataset=distil_dataset["train"],
+        eval_dataset=distil_dataset["validation"],
         # teacher_preds = load json from
         #   debiasing_methods/confidenceRegularization/dataset/teacher_preds_bert-base-uncased_finetuned_baseline.json
         #   pass somehow, so that model is fed with train_dataset
