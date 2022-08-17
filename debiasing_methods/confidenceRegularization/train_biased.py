@@ -10,7 +10,7 @@ import torch
 import pandas as pd
 
 from debiasing_methods.confidenceRegularization.utils import prepare_train_features, get_model_filename, \
-    get_preds_filename
+    get_preds_filename, get_dataset_path
 
 from isbiased.bias_significance import BiasSignificanceMeasure
 
@@ -228,7 +228,7 @@ def main():
     data['start_logits'] = pd.Series(predictions[0].tolist())
     data['end_logits'] = pd.Series(predictions[1].tolist())
     # predictions_path = os.path.join(args.preds_dir, "biased_preds" + "_" + biased_checkpoint + "_" + args.dataset +".json")
-    predictions_path = os.path.join(args.preds_dir, get_preds_filename(args.model, args.bias, args.dataset,True))
+    predictions_path = get_dataset_path(os.path.join(args.preds_dir, get_preds_filename(args.model, args.bias, args.dataset,True)))
     data.to_json(predictions_path)
 
     print(f"Knowledge distillation completed! 👌 \n"

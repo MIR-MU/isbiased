@@ -17,18 +17,18 @@ from debiasing_methods.confidenceRegularization.utils import *
 dirname = os.getcwd()
 
 
-def choose_distill_model(model_name: str, loss_fn: ClfDistillLossFunction):
+def choose_distill_model(model_name: str, loss_fn: ClfDistillLossFunction) -> AutoModelForQuestionAnswering:
     if model_name == 'bert-base-uncased':
-        model = DistillBertForQuestionAnswering.from_pretrained(model_name, loss_fn=loss_fn)
+        return DistillBertForQuestionAnswering.from_pretrained(model_name, loss_fn=loss_fn)
     elif model_name in ['roberta-base', 'roberta-large']:
-        model = DistillRobertaForQuestionAnswering.from_pretrained(model_name, loss_fn=loss_fn)
+        return DistillRobertaForQuestionAnswering.from_pretrained(model_name, loss_fn=loss_fn)
     elif model_name == 'electra-base-discriminator':
-        model = DistillElectraForQuestionAnswering.from_pretrained(model_name, loss_fn=loss_fn)
+        return DistillElectraForQuestionAnswering.from_pretrained(model_name, loss_fn=loss_fn)
 
-    return model
+    raise NotImplementedError(f"Model: '{model_name}' is not supported. Please, modify 'choose_distill_model' method!")
 
 
-def load_distill_preds(args, load_biased: bool):
+def load_distill_preds(args, load_biased: bool) -> DataFrame:
     filename = get_preds_filename(args.model, args.bias, args.dataset, load_biased)
     print(filename)
     print(get_dataset_path(filename))
@@ -66,11 +66,11 @@ def main():
     parser.add_argument("--output_dir",
                         default="./results",
                         type=str,
-                        help="The output directory where the model predictions and checkpoints will be written.")
-    parser.add_argument("--preds_dir",
-                        default="./dataset",
-                        type=str,
-                        help="Directory to save teacher predictions to.")
+                        help="The output directory where the model checkpoints will be written.")
+    # parser.add_argument("--preds_dir",
+    #                     default="./dataset",
+    #                     type=str,
+    #                     help="Directory to save teacher predictions to.")
     parser.add_argument("--max_seq_length",
                         default=384,
                         type=int,
