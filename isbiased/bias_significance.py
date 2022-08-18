@@ -7,7 +7,7 @@ import pandas as pd
 from datasets import Dataset
 from datasets import load_dataset, load_metric
 from tqdm.auto import tqdm
-from transformers import AutoModelForQuestionAnswering, BatchEncoding, Trainer
+from transformers import AutoModelForQuestionAnswering, BatchEncoding, Trainer, TrainingArguments
 from transformers import AutoTokenizer
 from transformers import default_data_collator
 
@@ -262,6 +262,8 @@ class BiasSignificanceMeasure:
             model,
             data_collator=data_collator,
             tokenizer=tokenizer,
+            args=TrainingArguments(output_dir=".",
+                                   per_device_eval_batch_size=batch_size)
         )
 
         # Preprocessing function for validation dataset from the HuggingFace Jupyter notebook
