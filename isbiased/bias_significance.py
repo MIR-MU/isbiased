@@ -235,12 +235,14 @@ class BiasSignificanceMeasure:
 
         return self._find_best_threshold_for_heuristic(distances_dict), Dataset.from_pandas(dfdataset)
 
-    def evaluate_model_on_dataset(self, model_path: str, dataset_eval: Dataset) -> Tuple[Dict[str, float], Dataset]:
+    def evaluate_model_on_dataset(self, model_path: str,
+                                  dataset_eval: Dataset, batch_size: int = 8) -> Tuple[Dict[str, float], Dataset]:
         """Evaluation of fine-tuned model on selected dataset
 
         Args:
             model_path (str): path to the QA model, it can be local path or path to model from HF hub
             dataset_eval (Dataset): dataset for evaluation
+            batch_size (int): size of the batch for evaluation inference
 
         Returns:
             Tuple[Dict[str, float], Dataset]: metrics for dataset - exact match and f1 score, and dataset
@@ -438,6 +440,7 @@ class BiasSignificanceMeasure:
             validation_features = dataset_eval.map(
                 prepare_validation_features,
                 batched=True,
+                batch_size=batch_size,
                 remove_columns=dataset_eval.column_names
             )
 

@@ -45,9 +45,9 @@ bias_id = "distances"
 
 # at first, we need to get predictions for our provided model and dataset, the function also computes metrics - exact match and f1
 # predictions will be added to the internal class DataFrame 
-metrics, dataset = bias_significance.evaluate_model_on_dataset(model_path, squad['validation'])
+metrics, dataset = measurer.evaluate_model_on_dataset(model_path, squad['validation'])
 
-threshold_distance_dictionary, dataset = bias_significance.find_longest_distance(dataset, heuristic)
+threshold_distance_dictionary, dataset = measurer.find_longest_distance(dataset, heuristic)
 best_heuristic_threshold, bias_significance, distances_dict = threshold_distance_dictionary
 
 print("Model '%s' bias '%s' significance is %s" % (model_path, bias_id, bias_significance))
@@ -59,7 +59,7 @@ significantly differentiate the model's performance ([full example](isbiased_exa
 # after running bias_significance.compute_heuristic(bias_id)
 # that finds the best threshold for selected heuristic is computed, then the heuristic is computed for provided dataset and data are split,
 # run:
-biasedDataset, unbiasedDataset = bias_significance.split_data_by_heuristics(dataset, datasets['train'], heuristic)
+biasedDataset, unbiasedDataset = measurer.split_data_by_heuristics(dataset, datasets['train'], heuristic)
 # biasedDataset contain biased (=better-performing samples) and unbiasedDataset contain unbiased (=worse-performing) data
 # biasedDataset can be used e.g. to train a "bias model"
 ```
