@@ -340,8 +340,11 @@ class BiasSignificanceMeasure:
             Returns:
                 collections.OrderedDict: _description_
             """
+            if len(raw_predictions) == 2:
+                all_start_logits, all_end_logits = raw_predictions
+            else:
+                all_start_logits, all_end_logits, _ = raw_predictions
 
-            all_start_logits, all_end_logits = raw_predictions
             # Build a map example to its corresponding features.
             example_id_to_index = {k: i for i, k in enumerate(examples["id"])}
             features_per_example = collections.defaultdict(list)
