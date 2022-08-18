@@ -170,11 +170,11 @@ class BiasSignificanceMeasure:
         """Finds the best threshold from dictionary of thresholds
 
         Args:
-            distances_dictionary (Dict[float, float]): dictionary with thresholds as keys, distances, lengths \
+            distances_dictionary (Dict[float, List[float]]): dictionary with thresholds as keys, distances, lengths \
                 and qunatiles as values
 
         Returns:
-            Tuple[float, float, Dict[float, float]]: best threshold, maximum distance (exact match) and the dictionary
+            Tuple[float, float, Dict[float, List[float]]]: best threshold, maximum distance (exact match) and the dictionary
         """
         best_threshold = -1
         max_distance = -1
@@ -203,7 +203,7 @@ class BiasSignificanceMeasure:
             heuristic (str): identicator of the heuristic
 
         Returns:
-            Tuple[float, float, Dict[float, float], Dataset]: best threshold, maximum distance (exact match) \
+            Tuple[Tuple[float, float, Dict[float, List[float]]], Dataset]: best threshold, maximum distance (exact match) \
                 and the dictionary returned from the _find_best_threshold_for_heuristic() method, and dataset
         """
         max_em_distance = 0
@@ -510,7 +510,8 @@ class BiasSignificanceMeasure:
         into biased and unbiased subsets
 
         Args:
-            dataset (Dataset): dataset to be split
+            dataset_for_evaluation (Dataset): dataset for finding the best threshold
+            dataset_for_split (Dataset): dataset to be split into biased and unbiased subsets
             heuristic (str): identificator of the heuristic
 
         Returns:
