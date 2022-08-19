@@ -8,7 +8,7 @@ from pandas import DataFrame
 from datasets import load_dataset, Dataset
 from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering, DefaultDataCollator, TrainingArguments, Trainer, \
-    PreTrainedModel
+    PreTrainedModel, EarlyStoppingCallback
 
 import torch
 
@@ -151,7 +151,7 @@ def main():
                         help="Subset of the training data. For testing.")
 
     parser.add_argument("--train_batch_size",
-                        default=4,
+                        default=32,
                         type=int,
                         help="Batch for training that fits into memory.")
     parser.add_argument('--gradient_accumulation_steps',
@@ -243,32 +243,29 @@ def main():
     distil_dataset = create_distill_dataset(tokenized_squad, teacher_model, bias_model)
 
     training_args = TrainingArguments(
-        output_dir=model_save_path,
-        evaluation_strategy="epoch",
-        learning_rate=args.learning_rate,
-        per_device_train_batch_size=args.train_batch_size,
-        per_device_eval_batch_size=args.eval_batch_size,
-        num_train_epochs=args.num_train_epochs,
-        weight_decay=0.01,
+            output_dir=model_save_path,
+            evaluation_strategy="steps",
+            eval_steps=1000,  # Evaluation and Save happens every 200 steps
+            save_steps=1000,
+            logging_steps=200,
+            save_total_limit=50,  # Only last 10 models are saved. Older ones are deleted.
+            learning_rate=args.learning_rate,
+            per_device_train_batch_size=args.train_batch_size,
+            per_device_eval_batch_size=args.eval_batch_size,
+            num_train_epochs=5,
+            warmup_ratio=0.1,
+            weight_decay=0.01,
+            load_best_model_at_end=True,
     )
 
-    # TODO - not working now!
-    # need to override Trainer, because of distillation - model's loss function needs input of teacher_preds and biased_preds
-    # MAYBE POSSIBLE TO COMBINE PREDICTIONS INTO ONE TRAIN DATASET - create_distill_dataset
     trainer = DistillerTrainer(
         model=distilled_model,
         args=training_args,
         train_dataset=distil_dataset["train"],
         eval_dataset=distil_dataset["validation"],
-        # teacher_preds = load json from
-        #   debiasing_methods/confidenceRegularization/dataset/teacher_preds_bert-base-uncased_finetuned_baseline.json
-        #   pass somehow, so that model is fed with train_dataset
-        teacher_predictions=None,
-        # biased_preds = same as teacher_preds
-        #   debiasing_methods/confidenceRegularization/dataset/teacher_preds_*.json
-        biased_predictions=None,
         tokenizer=tokenizer,
         data_collator=data_collator,
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=50)]
     )
 
     trainer.train()

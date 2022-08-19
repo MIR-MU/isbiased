@@ -17,8 +17,6 @@ class DistillerTrainer(Trainer):
             data_collator: Optional[DataCollator] = None,
             train_dataset: Optional[Dataset] = None,
             eval_dataset: Optional[Dataset] = None,
-            teacher_predictions : Optional[Dataset] = None,
-            biased_predictions : Optional[Dataset] = None,
             tokenizer: Optional[PreTrainedTokenizerBase] = None,
             model_init: Callable[[], PreTrainedModel] = None,
             compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
@@ -26,8 +24,6 @@ class DistillerTrainer(Trainer):
             optimizers: Tuple[torch.optim.Optimizer, torch.optim.lr_scheduler.LambdaLR] = (None, None),
             preprocess_logits_for_metrics: Callable[[torch.Tensor, torch.Tensor], torch.Tensor] = None,
     ):
-        self.teacher_predictions = teacher_predictions
-        self.biased_predictions = biased_predictions
 
         super().__init__(
             model= model,
