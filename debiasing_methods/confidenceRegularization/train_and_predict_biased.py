@@ -138,27 +138,6 @@ def main():
 
     squad_en = load_dataset(args.dataset)
 
-    if not is_saved(teacher_model, args):
-        measurer = BiasSignificanceMeasure(squad_en['train'])
-        measurer.evaluate_model_on_dataset(teacher_model, squad_en['train'])
-        measurer.compute_heuristic(args.bias)
-        biasedDataset, unbiasedDataset = measurer.split_data_by_heuristics(squad_en['train'], args.bias)
-
-        save_for_later(biasedDataset, teacher_model, True, args)
-        save_for_later(unbiasedDataset, teacher_model, False, args)
-
-    biasedDataset = load_saved_split(teacher_model, True, args)
-    unbiasedDataset = load_saved_split(teacher_model, False, args)
-
-    biased_dataset_train = biasedDataset.map(prepare_train_features, batched=True,
-                                             remove_columns=biasedDataset.column_names,
-                                             fn_kwargs={'tokenizer': biased_tokenizer, 'args': args})
-
-    unbiased_dataset_val = biasedDataset.select(range(1000)).map(prepare_train_features, batched=True,
-                                                                 remove_columns=unbiasedDataset.column_names,
-                                                                 fn_kwargs={'tokenizer': biased_tokenizer,
-                                                                            'args': args})
-
     tokenized_dataset_train = squad_en.map(prepare_train_features, batched=True,
                                            remove_columns=squad_en['train'].column_names,
                                            fn_kwargs={'tokenizer': biased_tokenizer, 'args': args})
@@ -167,6 +146,29 @@ def main():
     data_collator = DefaultDataCollator()
 
     if args.do_train:
+        # this block takes tremendeously long:
+        if not is_saved(teacher_model, args):
+            measurer = BiasSignificanceMeasure(squad_en['train'])
+            measurer.evaluate_model_on_dataset(teacher_model, squad_en['train'])
+            measurer.compute_heuristic(args.bias)
+            biasedDataset, unbiasedDataset = measurer.split_data_by_heuristics(squad_en['train'], args.bias)
+
+            save_for_later(biasedDataset, teacher_model, True, args)
+            save_for_later(unbiasedDataset, teacher_model, False, args)
+
+        biasedDataset = load_saved_split(teacher_model, True, args)
+        unbiasedDataset = load_saved_split(teacher_model, False, args)
+
+        biased_dataset_train = biasedDataset.map(prepare_train_features, batched=True,
+                                                 remove_columns=biasedDataset.column_names,
+                                                 fn_kwargs={'tokenizer': biased_tokenizer, 'args': args})
+
+        unbiased_dataset_val = biasedDataset.select(range(1000)).map(prepare_train_features, batched=True,
+                                                                     remove_columns=unbiasedDataset.column_names,
+                                                                     fn_kwargs={'tokenizer': biased_tokenizer,
+                                                                                'args': args})
+        # end block
+
         training_args = TrainingArguments(
             output_dir=model_save_path,
             evaluation_strategy="steps",
@@ -220,8 +222,8 @@ def main():
     )
 
     # prediction of whole dataset - predictions of BIASED model (trained on biased examples)
-    # predictions, label_ids, metrics = trainer.predict(test_dataset=tokenized_dataset_train['train'].select(range(100)))
-    predictions, label_ids, metrics = trainer.predict(test_dataset=tokenized_dataset_train['train'])
+    predictions, label_ids, metrics = trainer.predict(test_dataset=tokenized_dataset_train['train'].select(range(100)))
+    # predictions, label_ids, metrics = trainer.predict(test_dataset=tokenized_dataset_train['train'])
     # predictions contain outputs of net for all examples shape:
     #       2(as for start_logits and end_logits) * num_examples(dataset size) * num_outputs(output dimension of net)
     #           first row of shape is start_logits, second row is end_logits
