@@ -112,11 +112,11 @@ def main():
             output_dir=model_save_path,
             # evaluation_strategy="no",  # for testing
             evaluation_strategy="steps",
-            eval_steps=200,  # Evaluation and Save happens every 200 steps
-            save_steps=200,
+            eval_steps=1000,  # Evaluation and Save happens every 200 steps
+            save_steps=1000,
             logging_steps=200,
-            save_total_limit=5,  # Only last 5 models are saved. Older ones are deleted.
-            report_to="none",
+            save_total_limit=10,  # Only last 5 models are saved. Older ones are deleted.
+            # report_to="none",
             learning_rate=args.learning_rate,
             per_device_train_batch_size=args.train_batch_size,
             gradient_accumulation_steps=args.gradient_accumulation_steps,
@@ -126,7 +126,7 @@ def main():
             warmup_ratio=args.warmup_proportion,
             weight_decay=0.01,
             load_best_model_at_end=True,
-            disable_tqdm=True
+            # disable_tqdm=True
         )
 
         trainer = Trainer(
