@@ -8,9 +8,8 @@ import math
 class ClfDistillLossFunction(nn.Module):
     """Torch classification debiasing loss function"""
 
-    def forward(self, hidden, logits, bias, teach_probs, labels):
+    def forward(self, logits, bias, teach_probs, labels):
         """
-        :param hidden: [batch, n_features] hidden features from the model
         :param logits: [batch, n_classes] logit score for each class
         :param bias: [batch, n_classes] log-probabilties from the bias for each class
         :param teach_probs: techer prediction probabilities # FIXME check values
@@ -21,11 +20,18 @@ class ClfDistillLossFunction(nn.Module):
 
 
 class SmoothedDistillLoss(ClfDistillLossFunction):
-    def forward(self, hidden, logits, bias_probs, teacher_probs, labels):
+
+    def __init__(self):
+        super().__init__()
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    def forward(self, logits, bias_logits, teacher_logits, labels):
         softmaxf = torch.nn.Softmax(dim=1)
         probs = softmaxf(logits)
+        teacher_probs = softmaxf(teacher_logits)
+        bias_probs = softmaxf(bias_logits)
 
-        one_hot_labels = torch.eye(logits.size(1)).cuda()[labels]
+        one_hot_labels = torch.eye(logits.size(1)).to(self.device)[labels]
         weights = (1 - (one_hot_labels * torch.exp(bias_probs)).sum(1))
         weights = weights.unsqueeze(1).expand_as(teacher_probs)
 

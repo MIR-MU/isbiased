@@ -2,9 +2,10 @@ from typing import Optional, Union, Tuple
 
 import torch
 from torch import nn
+from torch.nn import CrossEntropyLoss
 
 from transformers import BertModel, BertPreTrainedModel, RobertaPreTrainedModel, RobertaModel, ElectraPreTrainedModel, \
-    ElectraConfig, ElectraModel
+    ElectraConfig, ElectraModel, BertForQuestionAnswering
 from transformers.modeling_outputs import QuestionAnsweringModelOutput
 
 from debiasing_methods.confidenceRegularization.overrides.loss import ClfDistillLossFunction
@@ -33,7 +34,7 @@ class BertDistill(BertPreTrainedModel):
         return logits, loss
 
 
-class DistillBertForQuestionAnswering(BertPreTrainedModel):
+class DistilBertForQuestionAnswering(BertForQuestionAnswering):
     """
     Pre-trained Distilled Bert for Question Answering which uses SmoothedDistillLoss loss function
 
@@ -71,7 +72,6 @@ class DistillBertForQuestionAnswering(BertPreTrainedModel):
             bias_probs_end=None,
             teacher_probs_start=None,
             teacher_probs_end=None,
-            labels = None,
     ) -> Union[Tuple[torch.Tensor], QuestionAnsweringModelOutput]:
         r"""
         start_positions (`torch.LongTensor` of shape `(batch_size,)`, *optional*):
@@ -118,14 +118,21 @@ class DistillBertForQuestionAnswering(BertPreTrainedModel):
 
             # TODO - check meaning of ignore_index
             # loss_fct = self.loss_fn(ignore_index=ignored_index)
-            loss_fct = self.loss_fn
             # fixme
             # bias and teacher_preds have 2 dimensions = 0: start, 1:end
             # start_loss = loss_fct(logits=start_logits, start_positions, bias_probs=bias_probs_start,
-                                  # teacher_probs=teacher_probs_start, labels=labels)
-            start_loss = loss_fct(logits=start_logits, bias_probs=bias_probs_start, teacher_probs=teacher_probs_start, labels=labels, hidden=None)
-            # end_loss = loss_fct(end_logits, end_positions, bias_probs, teacher_probs, labels)
-            end_loss = loss_fct(logits=end_logits, bias_probs=bias_probs_end, teacher_probs=teacher_probs_end, labels=labels, hidden=None)
+            # teacher_probs=teacher_probs_start, labels=labels)
+            if bias_probs_start is not None:
+
+                start_loss = self.loss_fn(logits=start_logits, bias_logits=bias_probs_start,
+                                          teacher_logits=teacher_probs_start, labels=start_positions)
+                end_loss = self.loss_fn(logits=end_logits, bias_logits=bias_probs_end,
+                                        teacher_logits=teacher_probs_end, labels=end_positions)
+            else:
+                loss_fct = CrossEntropyLoss(ignore_index=ignored_index)
+                start_loss = loss_fct(start_logits, start_positions)
+                end_loss = loss_fct(end_logits, end_positions)
+
             total_loss = (start_loss + end_loss) / 2
 
         if not return_dict:
@@ -139,6 +146,7 @@ class DistillBertForQuestionAnswering(BertPreTrainedModel):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
+
 
 class DistillRobertaForQuestionAnswering(RobertaPreTrainedModel):
     _keys_to_ignore_on_load_unexpected = [r"pooler"]
@@ -157,21 +165,21 @@ class DistillRobertaForQuestionAnswering(RobertaPreTrainedModel):
         self.post_init()
 
     def forward(
-        self,
-        input_ids: Optional[torch.LongTensor] = None,
-        attention_mask: Optional[torch.FloatTensor] = None,
-        token_type_ids: Optional[torch.LongTensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-        head_mask: Optional[torch.FloatTensor] = None,
-        inputs_embeds: Optional[torch.FloatTensor] = None,
-        start_positions: Optional[torch.LongTensor] = None,
-        end_positions: Optional[torch.LongTensor] = None,
-        output_attentions: Optional[bool] = None,
-        output_hidden_states: Optional[bool] = None,
-        return_dict: Optional[bool] = None,
-        bias_probs = None,
-        teacher_probs = None,
-        labels=None,
+            self,
+            input_ids: Optional[torch.LongTensor] = None,
+            attention_mask: Optional[torch.FloatTensor] = None,
+            token_type_ids: Optional[torch.LongTensor] = None,
+            position_ids: Optional[torch.LongTensor] = None,
+            head_mask: Optional[torch.FloatTensor] = None,
+            inputs_embeds: Optional[torch.FloatTensor] = None,
+            start_positions: Optional[torch.LongTensor] = None,
+            end_positions: Optional[torch.LongTensor] = None,
+            output_attentions: Optional[bool] = None,
+            output_hidden_states: Optional[bool] = None,
+            return_dict: Optional[bool] = None,
+            bias_probs=None,
+            teacher_probs=None,
+            labels=None,
     ) -> Union[Tuple[torch.Tensor], QuestionAnsweringModelOutput]:
         r"""
         start_positions (`torch.LongTensor` of shape `(batch_size,)`, *optional*):
@@ -254,21 +262,21 @@ class DistillElectraForQuestionAnswering(ElectraPreTrainedModel):
         self.post_init()
 
     def forward(
-        self,
-        input_ids: Optional[torch.Tensor] = None,
-        attention_mask: Optional[torch.Tensor] = None,
-        token_type_ids: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.Tensor] = None,
-        head_mask: Optional[torch.Tensor] = None,
-        inputs_embeds: Optional[torch.Tensor] = None,
-        start_positions: Optional[torch.Tensor] = None,
-        end_positions: Optional[torch.Tensor] = None,
-        output_attentions: Optional[bool] = None,
-        output_hidden_states: Optional[bool] = None,
-        return_dict: Optional[bool] = None,
-        bias_probs=None,
-        teacher_probs=None,
-        labels=None,
+            self,
+            input_ids: Optional[torch.Tensor] = None,
+            attention_mask: Optional[torch.Tensor] = None,
+            token_type_ids: Optional[torch.Tensor] = None,
+            position_ids: Optional[torch.Tensor] = None,
+            head_mask: Optional[torch.Tensor] = None,
+            inputs_embeds: Optional[torch.Tensor] = None,
+            start_positions: Optional[torch.Tensor] = None,
+            end_positions: Optional[torch.Tensor] = None,
+            output_attentions: Optional[bool] = None,
+            output_hidden_states: Optional[bool] = None,
+            return_dict: Optional[bool] = None,
+            bias_probs=None,
+            teacher_probs=None,
+            labels=None,
     ) -> Union[Tuple[torch.Tensor], QuestionAnsweringModelOutput]:
         r"""
         start_positions (`torch.LongTensor` of shape `(batch_size,)`, *optional*):
@@ -322,9 +330,9 @@ class DistillElectraForQuestionAnswering(ElectraPreTrainedModel):
 
         if not return_dict:
             output = (
-                start_logits,
-                end_logits,
-            ) + discriminator_hidden_states[1:]
+                         start_logits,
+                         end_logits,
+                     ) + discriminator_hidden_states[1:]
             return ((total_loss,) + output) if total_loss is not None else output
 
         return QuestionAnsweringModelOutput(

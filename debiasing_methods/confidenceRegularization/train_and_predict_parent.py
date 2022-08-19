@@ -119,9 +119,9 @@ def main():
             report_to="none",
             learning_rate=args.learning_rate,
             per_device_train_batch_size=args.train_batch_size,
-            gradient_accumulation_steps=args.gradien_accumulation_steps,
+            gradient_accumulation_steps=args.gradient_accumulation_steps,
             per_device_eval_batch_size=args.train_batch_size,
-            max_steps=2,  # for testing
+            # max_steps=2,  # for testing
             num_train_epochs=args.num_train_epochs,
             warmup_ratio=args.warmup_proportion,
             weight_decay=0.01,

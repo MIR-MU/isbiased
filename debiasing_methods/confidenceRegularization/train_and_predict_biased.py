@@ -78,7 +78,7 @@ def main():
                              "in theirs contexts.")
 
     parser.add_argument("--do_train",
-                        default=True,
+                        default=False,
                         help="Whether to run training.")
 
     parser.add_argument("--train_batch_size",
@@ -146,7 +146,7 @@ def main():
     data_collator = DefaultDataCollator()
 
     if args.do_train:
-        # this block takes tremendeously long:
+        # this block takes tremendously long:
         if not is_saved(teacher_model, args):
             measurer = BiasSignificanceMeasure(squad_en['train'])
             measurer.evaluate_model_on_dataset(teacher_model, squad_en['train'])
