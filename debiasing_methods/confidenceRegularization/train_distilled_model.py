@@ -1,16 +1,11 @@
 import argparse
-import os
-from typing import Dict
 
 import pandas as pd
-from pandas import DataFrame
-
 from datasets import load_dataset, Dataset
+from pandas import DataFrame
 from tqdm import tqdm
-from transformers import AutoTokenizer, AutoModelForQuestionAnswering, DefaultDataCollator, TrainingArguments, Trainer, \
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering, DefaultDataCollator, TrainingArguments, \
     PreTrainedModel, EarlyStoppingCallback
-
-import torch
 
 from debiasing_methods.confidenceRegularization.overrides.loss import SmoothedDistillLoss
 from debiasing_methods.confidenceRegularization.overrides.models import *
@@ -62,39 +57,18 @@ def create_distill_dataset(dataset: Dataset, teacher: PreTrainedModel, bias: Pre
     """
     Combine distillation examples (teacher_preds and bias_preds) into one dataset that can be fed through Trainer API
     :param dataset: Dataset in HF format
-    :param teacher: TODO
-    :param bias: TODO
+    :param teacher: Teacher QA model to distil from
+    :param bias: Biased QA model to downscale the Teacher's prediction with
     :return Dataset
     """
 
     teacher_start_logits, teacher_end_logits = infer_model_start_end_logits(teacher, dataset["train"])
     bias_start_logits, bias_end_logits = infer_model_start_end_logits(bias, dataset["train"])
 
-    # if len(train_dataset['train']) + len(train_dataset['validation']) != len(teacher_probs):
-    # assert len(teacher_start_logits) == len(teacher_end_logits) == len(bias_start_logits) == len(bias_end_logits)
-    print(len(teacher_start_logits), len(teacher_end_logits), len(bias_start_logits), len(bias_end_logits))
-    # TODO: why?:
-    # bias_probs = bias_preds['start_logits'] + bias_preds['end_logits']
-    # if len(train_dataset['train']) + len(train_dataset['validation']) != len(bias_probs):
-    # if len(dataset['train']) != len(bias_probs):
-    #     raise RuntimeError(f"Length of train_dataset is " +
-    #                        # f"{len(train_dataset['train']) + len(train_dataset['validation'])}, " +
-    #                         f"{len(dataset['train'])}, " +
-    #                         f"but length of teacher_probs is {len(teacher_probs)} and should be equal")
-
-
-    # train_len = len(dataset['train'])
-    # valid_len = len(train_dataset['validation'])
-
     dataset['train'] = dataset['train'].add_column('teacher_probs_start', teacher_start_logits.tolist())
     dataset['train'] = dataset['train'].add_column('teacher_probs_end', teacher_end_logits.tolist())
     dataset['train'] = dataset['train'].add_column('bias_probs_start', bias_start_logits.tolist())
     dataset['train'] = dataset['train'].add_column('bias_probs_end', bias_end_logits.tolist())
-
-    # train_dataset['validation'] = train_dataset['validation'].add_column('teacher_probs_start', teacher_preds['start_logits'][train_len:train_len+valid_len])
-    # train_dataset['validation'] = train_dataset['validation'].add_column('teacher_probs_end', teacher_preds['end_logits'][train_len:train_len+valid_len])
-    # train_dataset['validation'] = train_dataset['validation'].add_column('bias_probs_start', bias_preds['start_logits'][train_len:train_len+valid_len])
-    # train_dataset['validation'] = train_dataset['validation'].add_column('bias_probs_end', bias_preds['end_logits'][train_len:train_len+valid_len])
 
     return dataset
 
@@ -119,10 +93,6 @@ def main():
                         default="./results",
                         type=str,
                         help="The output directory where the model checkpoints will be written.")
-    # parser.add_argument("--preds_dir",
-    #                     default="./dataset",
-    #                     type=str,
-    #                     help="Directory to save teacher predictions to.")
     parser.add_argument("--max_seq_length",
                         default=384,
                         type=int,
@@ -214,28 +184,12 @@ def main():
     if args.eval_firstn:
         dataset["validation"] = dataset["validation"].select(range(args.eval_firstn))
 
-    ### for testing
-    # dataset = dataset['validation'].train_test_split(train_size=100)
-    # dataset = dataset['train'].train_test_split(train_size=0.8)
-    # dataset['validation'] = dataset['test']
-    # del dataset['test']
     tokenized_squad = dataset.map(prepare_train_features, batched=True,
                                   remove_columns=dataset["train"].column_names,
                                   fn_kwargs={'tokenizer': tokenizer, 'args': args})
-    ### for testing
-    # tokenized_squad['train'] = tokenized_squad['train'].select(range(80))
-    # tokenized_squad['validation'] = tokenized_squad['validation'].select(range(20))
-    # tokenized_squad['train'] = tokenized_squad['train']
-    # tokenized_squad['validation'] = tokenized_squad['validation']
-    ###
 
     print("Got dataset...")
     data_collator = DefaultDataCollator()
-
-    # create distilled dataset here
-    # merge tokenized dataest with parent_preds, biased_preds
-    # teacher_preds = load_distill_preds(args, False)
-    # biased_preds = load_distill_preds(args, True)
 
     bias_model = AutoModelForQuestionAnswering.from_pretrained(args.biased_model)
     teacher_model = AutoModelForQuestionAnswering.from_pretrained(args.teacher_model)
@@ -247,7 +201,7 @@ def main():
             evaluation_strategy="steps",
             eval_steps=1000,  # Evaluation and Save happens every 200 steps
             save_steps=1000,
-            logging_steps=200,
+            logging_steps=1000,
             save_total_limit=50,  # Only last 10 models are saved. Older ones are deleted.
             learning_rate=args.learning_rate,
             per_device_train_batch_size=args.train_batch_size,

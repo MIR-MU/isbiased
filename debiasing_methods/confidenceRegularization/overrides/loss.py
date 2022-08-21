@@ -5,6 +5,9 @@ from torch.nn import CrossEntropyLoss
 import numpy as np
 import math
 
+from torch.nn.functional import log_softmax, softmax
+
+
 class ClfDistillLossFunction(nn.Module):
     """Torch classification debiasing loss function"""
 
@@ -25,20 +28,21 @@ class SmoothedDistillLoss(ClfDistillLossFunction):
         super().__init__()
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    def forward(self, logits, bias_logits, teacher_logits, labels):
+    def forward(self, logits, bias_logits, teacher_logits, labels, scaling_portion: int = 5):
         softmaxf = torch.nn.Softmax(dim=1)
-        probs = softmaxf(logits)
-        teacher_probs = softmaxf(teacher_logits)
-        bias_probs = softmaxf(bias_logits)
+
+        teacher_probs = softmaxf(teacher_logits.exp())
+        bias_probs = softmaxf(bias_logits.exp())
 
         one_hot_labels = torch.eye(logits.size(1)).to(self.device)[labels]
-        weights = (1 - (one_hot_labels * torch.exp(bias_probs)).sum(1))
+        weights = (1 - ((one_hot_labels * bias_probs) / scaling_portion).sum(1))
         weights = weights.unsqueeze(1).expand_as(teacher_probs)
 
         exp_teacher_probs = teacher_probs ** weights
         norm_teacher_probs = exp_teacher_probs / exp_teacher_probs.sum(1).unsqueeze(1).expand_as(teacher_probs)
 
-        example_loss = -(norm_teacher_probs * probs.log()).sum(1)
-        batch_loss = example_loss.mean()
+        # equivalent to the original
+        # batch_loss = -(norm_teacher_probs * probs.log()).sum(1).mean()
+        batch_loss = CrossEntropyLoss()(logits, norm_teacher_probs)
 
         return batch_loss
