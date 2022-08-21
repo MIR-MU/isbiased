@@ -133,11 +133,11 @@ def main():
                         type=int,
                         help="Batch size for evaluation that fits into memory.")
     parser.add_argument("--learning_rate",
-                        default=2e-5,
+                        default=5e-5,
                         type=float,
                         help="The initial learning rate for Adam.")
     parser.add_argument("--num_train_epochs",
-                        default=3.0,
+                        default=10.0,
                         type=float,
                         help="Total number of training epochs to perform.")
     parser.add_argument("--warmup_proportion",
@@ -206,7 +206,7 @@ def main():
             learning_rate=args.learning_rate,
             per_device_train_batch_size=args.train_batch_size,
             per_device_eval_batch_size=args.eval_batch_size,
-            num_train_epochs=5,
+            num_train_epochs=args.num_train_epochs,
             warmup_ratio=0.1,
             weight_decay=0.01,
             load_best_model_at_end=True,
@@ -219,7 +219,7 @@ def main():
         eval_dataset=distil_dataset["validation"],
         tokenizer=tokenizer,
         data_collator=data_collator,
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=50)]
+#         callbacks=[EarlyStoppingCallback(early_stopping_patience=50)]
     )
 
     trainer.train()
