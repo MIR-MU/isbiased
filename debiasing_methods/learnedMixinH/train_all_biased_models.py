@@ -21,16 +21,14 @@ trained_biases = ['kth_sentence', 'cosine_similarity', 'answer_length', 'max_sim
 squad_en = load_dataset("squad")
 measurer = BiasSignificanceMeasure()
 
-measurer.evaluate_model_on_dataset(biased_model_path, squad_en['validation'])
+metrics, dataset = measurer.evaluate_model_on_dataset(biased_model_path, squad_en['train'])
 
 for bias_id in trained_biases:
     lang_module = LangModule(starting_checkpoint)
 
     val_metrics = [F1ScoreForQA()]
 
-    measurer.compute_heuristic(bias_id)
-
-    biasedDataset, unbiasedDataset = measurer.split_data_by_heuristics(squad_en['train'], bias_id)
+    biasedDataset, unbiasedDataset = measurer.split_data_by_heuristics(dataset, squad_en['train'], bias_id)
 
     squad_train_biased = biasedDataset.filter(lambda entry: len(entry["context"]) < 2000)
 
