@@ -2,13 +2,11 @@ from bias_significance import *
 import pandas as pd
 from datasets import Dataset
 
+# provided dataset needs to be in squad format and contain columns 'id', 'title', 'context', 'question', 'answers'
 datasets = load_dataset("squad")
 
-# when creating an object, dataset needs to be provided, you can optionally set values for iterations (default 100) and sample_size (default 800) 
-# in this example, squad validation is used
-# provided dataset needs to be in squad format and contain columns 'id', 'title', 'context', 'question', 'answers'
-
-bias_significance = BiasSignificanceMeasure(datasets['validation'].select(range(2000)))
+# when creating an object, you can optionally set values for iterations (default 100) and sample_size (default 800) 
+bias_significance = BiasSignificanceMeasure()
 
 # you can use local folder with finetuned model or some qa model from huggingface
 model_path = '/models/electra-base-discriminator-finetuned-squad_with_callbacks_baseline'  #path to local folder with fine-tuned model
@@ -17,12 +15,15 @@ model_path = '/models/electra-base-discriminator-finetuned-squad_with_callbacks_
 
 # at first, we need to get predictions for our provided model and dataset, the function also computes metrics - exact match and f1
 # predictions will be added to the internal class DataFrame 
-bias_significance.evaluate_model_on_dataset(model_path, datasets['validation'].select(range(2000)))
+# function also returns dataset with predictions
+metrics, dataset = bias_significance.evaluate_model_on_dataset(model_path, datasets['validation'].select(range(2000)))
 
 # function find_longest_distance() does the measuring of bias significance based on selected heuristic for every possible threshold
 # it can be used to find the best threshold - the one with highest distance between intervals
-# the function takes one parameter, heuristic, which is the name of selected heuristic
-# the function returns the best threshold, the maximum exact match distance and dictionary containing data for every threshold
+# the function takes two parameters, dataset, which is Dataset object, 
+# and heuristic, which is the name of selected heuristic
+# the function returns the best threshold, the maximum exact match distance and dictionary containing data for every threshold, 
+# and dataset
 # the value for heuristic can be one of the following:
 # 'similar_words'
 # 'distances'
@@ -32,11 +33,12 @@ bias_significance.evaluate_model_on_dataset(model_path, datasets['validation'].s
 # 'max_sim_ents'
 # 'answer_subject_positions'
 heuristic = 'distances'
-bias_significance.compute_heuristic(heuristic) #compute heuristic
-best_threshold, max_distance, distances_dictionary = bias_significance.find_longest_distance(heuristic)
+
+threshold_distance_dictionary, dataset = bias_significance.find_longest_distance(dataset, heuristic)
+best_threshold, max_distance, distances_dictionary = threshold_distance_dictionary
 
 print((best_threshold, max_distance, distances_dictionary))
 
-biasedDataset, unbiasedDataset = bias_significance.split_data_by_heuristics(datasets['train'], heuristic)
+biasedDataset, unbiasedDataset = bias_significance.split_data_by_heuristics(dataset, datasets['train'], heuristic)
 
 print((biasedDataset, unbiasedDataset))

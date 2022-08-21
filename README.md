@@ -14,7 +14,7 @@ git clone -b {this branch} git+https://github.com/MIR-MU/isbiased.git
 pip install -e isbiased
 ```
 
-Instantiate the main `BiasSignificanceMeasure` class on a specified dataset(?) in HF format(?):
+Instantiate the main `BiasSignificanceMeasure` class:
 ```python
 from isbiased.bias_significance import BiasSignificanceMeasure
 from datasets import load_dataset
@@ -22,10 +22,8 @@ from datasets import load_dataset
 # provided dataset needs to be in squad format and contain columns 'id', 'title', 'context', 'question', 'answers'
 squad = load_dataset("squad")
 
-# full dataset - takes longer:
-measurer = BiasSignificanceMeasure(squad['train'])
-# or subset - faster:
-measurer = BiasSignificanceMeasure(squad['train'].select(range(2000)))
+measurer = BiasSignificanceMeasure()
+
 ```
 
 Then, you can do one, or more of the following:
@@ -47,10 +45,10 @@ bias_id = "distances"
 
 # at first, we need to get predictions for our provided model and dataset, the function also computes metrics - exact match and f1
 # predictions will be added to the internal class DataFrame 
-bias_significance.evaluate_model_on_dataset(model_path, squad['validation'])
+metrics, dataset = measurer.evaluate_model_on_dataset(model_path, squad['validation'])
 
-bias_significance.compute_heuristic(bias_id)  # compute heuristic
-best_heuristic_threshold, bias_significance, distances_dict = bias_significance.find_longest_distance(heuristic)
+threshold_distance_dictionary, dataset = measurer.find_longest_distance(dataset, heuristic)
+best_heuristic_threshold, bias_significance, distances_dict = threshold_distance_dictionary
 
 print("Model '%s' bias '%s' significance is %s" % (model_path, bias_id, bias_significance))
 ```
@@ -61,7 +59,7 @@ significantly differentiate the model's performance ([full example](isbiased_exa
 # after running bias_significance.compute_heuristic(bias_id)
 # that finds the best threshold for selected heuristic is computed, then the heuristic is computed for provided dataset and data are split,
 # run:
-biasedDataset, unbiasedDataset = bias_significance.split_data_by_heuristics(datasets['train'], heuristic)
+biasedDataset, unbiasedDataset = measurer.split_data_by_heuristics(dataset, datasets['train'], heuristic)
 # biasedDataset contain biased (=better-performing samples) and unbiasedDataset contain unbiased (=worse-performing) data
 # biasedDataset can be used e.g. to train a "bias model"
 ```

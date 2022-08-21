@@ -14,17 +14,18 @@ class LearnedMixinH(ExtractiveQA):
     # https://github.com/chrisc36/debias/blob/master/debias/modules/qa_debias_loss_functions.py#L26
     # https://github.com/chrisc36/debias/blob/master/debias/bert/clf_debias_loss_functions.py#L48
 
-    def __init__(self, *args, biased_model: 'QuestionAnsweringModel', penalty: float = 0.03, **kwargs):
+    def __init__(self, *args, biased_model: 'QuestionAnsweringModel', device: str, penalty: float = 0.03, **kwargs):
         super().__init__(*args, **kwargs)
         logger.warning("We have no way to check that given biased_model is really for QA :/ Be sure to pass QA model.")
         self.compatible_head_model.config.output_hidden_states = True  # we fit bias scalar on the model hidden states
 
-        self.biased_model = biased_model
+        # devices of all modules are to be set according to the compatible_head_model's device
+        self.biased_model = biased_model.to(device)
         self.penalty = penalty
 
         self.learned_bias_scalar = torch.nn.Linear(in_features=2 * self.compatible_head_model.config.hidden_size,
                                                    out_features=1,
-                                                   device=self.compatible_head_model.device)
+                                                   device=device)
 
     def _bias_prediction(self,
                          inputs: Optional[Union[BatchEncoding, Dict[str, torch.Tensor]]]
@@ -39,8 +40,12 @@ class LearnedMixinH(ExtractiveQA):
                       labels: torch.LongTensor,
                       inputs: Optional[Union[BatchEncoding, Dict[str, torch.Tensor]]] = None,
                       attention_mask: Optional[torch.LongTensor] = None) -> torch.FloatTensor:
+        # implemented according to https://github.com/chrisc36/debias:
+        # 1. debias.bert.clf_debias_loss_functions.LearnedMixin.forward()
+        # 2. debias.modules.qa_debias_loss_functions.LearnedMixin.compute_qa_loss()
 
-        biased_start_logits, biased_end_logits = self._bias_prediction(inputs)
+        with torch.no_grad():
+            biased_start_logits, biased_end_logits = self._bias_prediction(inputs)
 
         start_lprobs = model_outputs.start_logits.log_softmax(1)
         end_lprobs = model_outputs.end_logits.log_softmax(1)
@@ -48,7 +53,7 @@ class LearnedMixinH(ExtractiveQA):
         start_hidden = model_outputs.hidden_states[-1][torch.arange(0, labels.shape[0]), start_lprobs.argmax(-1)]
         end_hidden = model_outputs.hidden_states[-1][torch.arange(0, labels.shape[0]), end_lprobs.argmax(-1)]
 
-        bias_scale = self.learned_bias_scalar.forward(torch.hstack([start_hidden, end_hidden]))
+        bias_scale = self.learned_bias_scalar(torch.hstack([start_hidden, end_hidden]))
         bias_scale = F.softplus(bias_scale)
 
         biased_start_logits = biased_start_logits * bias_scale
