@@ -286,7 +286,7 @@ class ComputeHeuristics:
             max = 0
             for item in q_sub:
                 if item in context:
-                    indexes = [m.start() for m in re.finditer(item, context)]
+                    indexes = [m.start() for m in re.finditer(re.escape(item), context)]
                     counter = 0
                     for index in indexes:
                         if answer['answer_start'][0] < index:
