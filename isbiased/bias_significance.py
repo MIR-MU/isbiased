@@ -181,7 +181,7 @@ class BiasSignificanceMeasure:
         size_of_smaller = 0
 
         for key, value in zip(distances_dictionary.keys(), distances_dictionary.values()):
-            if (value[0] > max_distance and max_distance == -1) or (max_distance != -1 and (
+            if (value[0] > 0 and max_distance == -1) or (max_distance != -1 and (
                     value[0] > max_distance or (value[0] > 0 and size_of_smaller < self.sample_size * 2)) and value[
                                                                         2] > self.sample_size * 2 and value[
                                                                         3] > self.sample_size * 2):
@@ -541,7 +541,6 @@ class BiasSignificanceMeasure:
                 biasedDataset, unbiasedDataset = [x for _, x in dataset.groupby(dataset[heuristic] <= best_threshold)]
 
         else:
-            print('Dataset was not split!!!')
-            return (dataset_for_split, dataset_for_split)
+            raise ValueError("No threshold for data split found - dataset can not be split!")
 
         return Dataset.from_pandas(biasedDataset), Dataset.from_pandas(unbiasedDataset)
