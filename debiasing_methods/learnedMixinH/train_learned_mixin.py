@@ -52,14 +52,14 @@ mixin_objective = LearnedMixinH(lang_module,
                                 penalty=0.4)
 
 # bias logging:
-measurer = BiasSignificanceMeasure(squad_en['train'])
+measurer = BiasSignificanceMeasure()
 
 # we need already-trained model for splitting the data to biased+non-biased
 # this finds the optimal threshold for the heuristic and adds a splitting attribute to the dataset
-metrics, dataset = measurer.evaluate_model_on_dataset(args.full_model_path, squad_en['train'])
+metrics, dataset = measurer.evaluate_model_on_dataset(args.full_model_path, squad_en['validation'])
 
 # segments the dataset by pre-computed threshold
-biasedDataset, unbiasedDataset = measurer.split_data_by_heuristics(dataset, squad_en['validation'], args.bias)
+biasedDataset, unbiasedDataset = measurer.split_data_by_heuristics(dataset, squad_en["train"], args.bias_id)
 
 biased_objective = ExtractiveQA(lang_module,
                                 texts_or_path=biasedDataset["question"],
