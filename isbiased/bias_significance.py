@@ -263,7 +263,8 @@ class BiasSignificanceMeasure:
             data_collator=data_collator,
             tokenizer=tokenizer,
             args=TrainingArguments(output_dir=".",
-                                   per_device_eval_batch_size=batch_size)
+                                   per_device_eval_batch_size=batch_size,
+                                   eval_accumulation_steps=16)
         )
 
         # Preprocessing function for validation dataset from the HuggingFace Jupyter notebook
