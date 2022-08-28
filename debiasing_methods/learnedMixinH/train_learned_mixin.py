@@ -19,7 +19,7 @@ parser.add_argument("--trained_model", default="bert-base-cased", type=str, help
 parser.add_argument("--full_model_path", type=str, help="A model trained on a full dataset, "
                                                         "presumably having biased predictions")
 parser.add_argument("--biased_model_path", type=str, help="Bias model")
-parser.add_argument("--bias", type=str, help="On which bias to train model. Supports all biases of 'isbiased' lib. "
+parser.add_argument("--bias_id", type=str, help="On which bias to train model. Supports all biases of 'isbiased' lib. "
                                              "Possible values: 'similar_words','distances','kth_sentence',"
                                              "'cosine_similarity', 'answer_length',"
                                              "'max_sim_ents','answer_subject_positions'")
@@ -49,7 +49,8 @@ mixin_objective = LearnedMixinH(lang_module,
                                 batch_size=30,
                                 val_evaluators=[F1ScoreForQA()],
                                 objective_id="SQUAD-en",
-                                penalty=0.4)
+                                penalty=0.4,
+                                bias_scale_proportion=10)
 
 # bias logging:
 measurer = BiasSignificanceMeasure()
@@ -87,12 +88,12 @@ non_biased_objective = ExtractiveQA(lang_module,
                                     share_other_objective_head=mixin_objective)
 # end: bias logging
 
-training_arguments = AdaptationArguments(output_dir="LMix-%s-%s-checkpoints" % (args.bias, args.trained_model),
+training_arguments = AdaptationArguments(output_dir="LMix-%s-%s-checkpoints" % (args.bias_id, args.trained_model),
                                          learning_rate=5e-5,
                                          stopping_strategy=StoppingStrategy.ALL_OBJECTIVES_NUM_EPOCHS,
                                          do_train=True,
                                          do_eval=True,
-                                         warmup_steps=1000,
+                                         warmup_steps=2000,
                                          max_steps=200000,
                                          eval_steps=1000,
                                          logging_steps=100,

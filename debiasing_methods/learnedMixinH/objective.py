@@ -14,7 +14,12 @@ class LearnedMixinH(ExtractiveQA):
     # https://github.com/chrisc36/debias/blob/master/debias/modules/qa_debias_loss_functions.py#L26
     # https://github.com/chrisc36/debias/blob/master/debias/bert/clf_debias_loss_functions.py#L48
 
-    def __init__(self, *args, biased_model: 'QuestionAnsweringModel', device: str, penalty: float = 0.03, **kwargs):
+    def __init__(self, *args,
+                 biased_model: 'QuestionAnsweringModel',
+                 device: str,
+                 penalty: float,
+                 bias_scale_proportion: int,
+                 **kwargs):
         super().__init__(*args, **kwargs)
         logger.warning("We have no way to check that given biased_model is really for QA :/ Be sure to pass QA model.")
         self.compatible_head_model.config.output_hidden_states = True  # we fit bias scalar on the model hidden states
@@ -22,6 +27,7 @@ class LearnedMixinH(ExtractiveQA):
         # devices of all modules are to be set according to the compatible_head_model's device
         self.biased_model = biased_model.to(device)
         self.penalty = penalty
+        self.bias_scale_proportion = bias_scale_proportion
 
         self.learned_bias_scalar = torch.nn.Linear(in_features=2 * self.compatible_head_model.config.hidden_size,
                                                    out_features=1,
@@ -39,7 +45,8 @@ class LearnedMixinH(ExtractiveQA):
                       model_outputs: QuestionAnsweringModelOutput,
                       labels: torch.LongTensor,
                       inputs: Optional[Union[BatchEncoding, Dict[str, torch.Tensor]]] = None,
-                      attention_mask: Optional[torch.LongTensor] = None) -> torch.FloatTensor:
+                      attention_mask: Optional[torch.LongTensor] = None,
+                      scale: int = 10) -> torch.FloatTensor:
         # implemented according to https://github.com/chrisc36/debias:
         # 1. debias.bert.clf_debias_loss_functions.LearnedMixin.forward()
         # 2. debias.modules.qa_debias_loss_functions.LearnedMixin.compute_qa_loss()
@@ -64,10 +71,13 @@ class LearnedMixinH(ExtractiveQA):
 
         cross_entropy_loss = torch.nn.CrossEntropyLoss()
 
-        # TODO check: summing up trained logPROBS with bias LOGITS! Different scaling, but consistent with original git.
+        # original implementation sums logPROBS with bias LOGITS,
         # though inconsistent with the paper (https://aclanthology.org/D19-1418.pdf Sec. 3.2.4)
-        start_loss = cross_entropy_loss(model_outputs.start_logits + biased_start_logits, inputs["start_position"])
-        end_loss = cross_entropy_loss(model_outputs.end_logits + biased_end_logits, inputs["end_position"])
+        # we measure that the impact on performance is negligible and opt for the paper variant:
+        start_loss = cross_entropy_loss(model_outputs.start_logits + biased_start_logits / self.bias_scale_proportion,
+                                        inputs["start_position"])
+        end_loss = cross_entropy_loss(model_outputs.end_logits + biased_end_logits / self.bias_scale_proportion,
+                                      inputs["end_position"])
 
         total_loss = (start_loss + end_loss) / 2
 
