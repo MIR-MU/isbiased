@@ -1,0 +1,17 @@
+Pre-trained model,dataset,value
+BERT-Base,AdversarialQA,29.76
+BERT-Base,NaturalQuestions,67.85
+BERT-Base,TriviaQA,46.14
+BERT-Base,average,47.92
+RoBERTa-Base,AdversarialQA,36.66
+RoBERTa-Base,NaturalQuestions,73.73
+RoBERTa-Base,TriviaQA,49.08
+RoBERTa-Base,average,53.16
+Electra-Base,AdversarialQA,37.15
+Electra-Base,NaturalQuestions,72.58
+Electra-Base,TriviaQA,47.90
+Electra-Base,average,52.54
+RoBERTa-Large,AdversarialQA,46.64
+RoBERTa-Large,NaturalQuestions,73.06
+RoBERTa-Large,TriviaQA,55.30
+RoBERTa-Large,average,58.33
