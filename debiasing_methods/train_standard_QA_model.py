@@ -19,7 +19,7 @@ def main():
     parser = argparse.ArgumentParser()
 
     ## Required parameters
-    parser.add_argument("--model", default="./saved_models/bert-base-uncased_finetuned_baseline", type=str,
+    parser.add_argument("--model", default="bert-base-cased", type=str,
                         help="Bert pre-trained model")
     parser.add_argument("--dataset", default="squad", type=str,
                         help="HuggingFace dataset name, e.g.: 'squad'")
@@ -159,22 +159,7 @@ def main():
         data_collator=data_collator,
     )
 
-    # predictions, label_ids, metrics = trainer.predict(test_dataset=tokenized_squad['train'].select(range(100)))
-    predictions, label_ids, metrics = trainer.predict(test_dataset=tokenized_squad['train'])
-    # predictions contain outputs of net for all examples shape:
-    #       2(as for start_logits and end_logits) * num_examples(dataset size) * num_outputs(output dimension of net)
-    #           first row of shape is start_logits, second row is end_logits
-
-    data = pd.DataFrame()
-    data['start_logits'] = pd.Series(predictions[0].tolist())
-    data['end_logits'] = pd.Series(predictions[1].tolist())
-    # predictions_path = os.path.join(args.preds_dir,"teacher_preds" + "_" + os.path.basename(model.name_or_path)+"_"+args.dataset +".json")
-    predictions_path = get_dataset_path(
-        get_preds_filename(os.path.basename(model.name_or_path), "", args.dataset, False))
-    data.to_json(predictions_path)
-
-    print(f"Knowledge distillation completed! 👌 \n"
-          f"Teacher predictions saved at:   {predictions_path}")
+    print(f"Teacher training completed! 👌")
 
 
 if __name__ == '__main__':

@@ -166,7 +166,7 @@ def main():
     print("Model:   ", model_checkpoint)
     print("Bias model:   ", args.biased_model)
     print("Teacher model:   ", args.teacher_model)
-    debiased_name = "debiased-conf_reg-" + model_checkpoint
+    debiased_name = "debiased-conf_reg-%s-%s" % (model_checkpoint, args.bias)
 
     model_save_path = os.path.join(dirname, 'saved_models', debiased_name)
 

@@ -1,0 +1,5 @@
+transformers==4.21.0
+datasets==2.4.0
+torch==1.12.0+cu116
+datasets
+adaptor[generative]==0.1.5

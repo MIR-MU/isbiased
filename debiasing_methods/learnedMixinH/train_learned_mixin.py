@@ -20,9 +20,9 @@ parser.add_argument("--full_model_path", type=str, help="A model trained on a fu
                                                         "presumably having biased predictions")
 parser.add_argument("--biased_model_path", type=str, help="Bias model")
 parser.add_argument("--bias_id", type=str, help="On which bias to train model. Supports all biases of 'isbiased' lib. "
-                                             "Possible values: 'similar_words','distances','kth_sentence',"
-                                             "'cosine_similarity', 'answer_length',"
-                                             "'max_sim_ents','answer_subject_positions'")
+                                                "Possible values: 'similar_words','distances','kth_sentence',"
+                                                "'cosine_similarity', 'answer_length',"
+                                                "'max_sim_ents','answer_subject_positions'")
 parser.add_argument("--num_val_samples", type=int, help="A number of validation samples", default=200)
 
 args = parser.parse_args()
@@ -68,7 +68,8 @@ biased_objective = ExtractiveQA(lang_module,
                                 labels_or_path=[a["text"][0] for a in biasedDataset["answers"]],
                                 val_texts_or_path=biasedDataset["question"][:args.num_val_samples],
                                 val_text_pair_or_path=biasedDataset["context"][:args.num_val_samples],
-                                val_labels_or_path=[a["text"][0] for a in biasedDataset["answers"]][:args.num_val_samples],
+                                val_labels_or_path=[a["text"][0] for a in biasedDataset["answers"]][
+                                                   :args.num_val_samples],
                                 batch_size=30,
                                 val_evaluators=[F1ScoreForQA()],
                                 objective_id="SQUAD-en-biased",
@@ -87,6 +88,19 @@ non_biased_objective = ExtractiveQA(lang_module,
                                     objective_id="SQUAD-en-non-biased",
                                     share_other_objective_head=mixin_objective)
 # end: bias logging
+aqa = load_dataset("adversarial_qa", "adversarialQA")["validation"].select(range(2000))
+
+ood_objective = ExtractiveQA(lang_module,
+                             texts_or_path=aqa["question"],
+                             text_pair_or_path=aqa["context"],
+                             labels_or_path=[a["text"][0] for a in aqa["answers"]],
+                             val_texts_or_path=aqa["question"][:args.num_val_samples],
+                             val_text_pair_or_path=aqa["context"][:args.num_val_samples],
+                             val_labels_or_path=[a["text"][0] for a in aqa["answers"]][:args.num_val_samples],
+                             batch_size=30,
+                             val_evaluators=[F1ScoreForQA()],
+                             objective_id="OOD-AQA",
+                             share_other_objective_head=mixin_objective)
 
 training_arguments = AdaptationArguments(output_dir="LMix-%s-%s-checkpoints" % (args.bias_id, args.trained_model),
                                          learning_rate=5e-5,
@@ -103,7 +117,7 @@ training_arguments = AdaptationArguments(output_dir="LMix-%s-%s-checkpoints" % (
                                          evaluation_strategy="steps")
 
 schedule = ParallelSchedule(objectives=[mixin_objective],
-                            extra_eval_objectives=[biased_objective, non_biased_objective],
+                            extra_eval_objectives=[biased_objective, non_biased_objective, ood_objective],
                             args=training_arguments)
 
 adapter = Adapter(lang_module, schedule, args=training_arguments)
