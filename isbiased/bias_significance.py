@@ -56,12 +56,14 @@ class BiasSignificanceMeasure:
         exact_list = []
         f1_list = []
 
-        for i in tqdm(range(self.iterations)):
+        i = 0
+        for _ in tqdm(range(self.iterations), desc="Bootstrapped bias evaluation. One of many candidate thresholds"):
             df = data.sample(n=self.sample_size)
             sample = Dataset.from_pandas(df)
             metrics1 = self._compute_metrics_for_sample(sample)
             exact_list.append(metrics1['exact_match'])
             f1_list.append(metrics1['f1'])
+            i += 1
 
         d = {'exact_match': exact_list, 'f1': f1_list}
         df = pd.DataFrame(d)
@@ -526,7 +528,7 @@ class BiasSignificanceMeasure:
         """
         threshold_distance_dictionary, ds = self.find_longest_distance(dataset_for_evaluation, heuristic)
         best_threshold, distance, dist_dict = threshold_distance_dictionary
-        # print(best_threshold)
+        print("Heuristic %s best found threshold: %s" % (heuristic, best_threshold))
         # print(distance)
         # print(dist_dict)
 
