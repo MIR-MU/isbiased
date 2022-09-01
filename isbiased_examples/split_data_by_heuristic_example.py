@@ -1,6 +1,6 @@
-from bias_significance import *
+from isbiased.bias_significance import BiasSignificanceMeasure
 import pandas as pd
-from datasets import Dataset
+from datasets import load_dataset
 
 # provided dataset needs to be in squad format and contain columns 'id', 'title', 'context', 'question', 'answers'
 datasets = load_dataset("squad")
@@ -10,7 +10,7 @@ bias_significance = BiasSignificanceMeasure()
 
 # you can use local folder with finetuned model or some qa model from huggingface
 # model_path = 'models/roberta-base-finetuned-squad_with_callbacks_baseline' #path to local folder with fine-tuned model
-model_path = 'bert-base-multilingual-cased' #path to local folder with fine-tuned model
+model_path = 'distilbert-base-uncased-distilled-squad' #path to local folder with fine-tuned model
 # bert base model fine-tuned on squad dataset from huggingface
 # model_path = 'csarron/bert-base-uncased-squad-v1'
 
@@ -38,4 +38,4 @@ heuristic = 'distances'
 # in this example, squad train is used and selected heuristic is 'distances'
 biasedDataset, unbiasedDataset = bias_significance.split_data_by_heuristics(dataset, datasets['train'], heuristic)
 
-print(biasedDataset)
+print((biasedDataset, unbiasedDataset))
