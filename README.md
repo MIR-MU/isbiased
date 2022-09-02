@@ -59,7 +59,7 @@ significantly differentiate the model's performance ([full example](isbiased_exa
 
 # dataset from find_longest_distance() contain the flags of the dataset segmentation
 biased_dataset, nonbiased_dataset = measurer.split_data_by_heuristics(dataset, squad['train'], bias_id)
-# now, biasedDataset contain biased (=better-performing samples) and unbiasedDataset contain unbiased (=worse-performing) data
+# now, biased_dataset contain biased (=better-performing samples) and nonbiased_dataset contain unbiased (=worse-performing) data
 # segments can also be used e.g. to train a "bias model", 
 # or to manually evaluate a difference in the model's performance on unbiased segment
 ```
