@@ -23,7 +23,7 @@ setup(
     author_email="tobe@filled.com",
     python_requires=">=3.7",
     license="MIT",
-    packages=find_packages(where="isbiased"),
+    packages=find_packages(include=["isbiased", "isbiased.*"]),
     include_package_data=True,
     zip_safe=True,
     install_requires=[

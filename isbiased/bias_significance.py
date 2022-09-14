@@ -235,7 +235,8 @@ class BiasSignificanceMeasure:
 
         return self._find_best_threshold_for_heuristic(distances_dict), Dataset.from_pandas(dfdataset)
 
-    def evaluate_model_on_dataset(self, model_path: str,
+    @staticmethod
+    def evaluate_model_on_dataset(model_path: str,
                                   dataset_eval: Dataset, batch_size: int = 8) -> Tuple[Dict[str, float], Dataset]:
         """Evaluation of fine-tuned model on selected dataset
 
