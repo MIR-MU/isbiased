@@ -20,10 +20,11 @@ parser.add_argument("--full_model_path", type=str, help="A model trained on a fu
                                                         "presumably having biased predictions")
 parser.add_argument("--biased_model_path", type=str, help="Bias model")
 parser.add_argument("--bias_id", type=str, help="On which bias to train model. Supports all biases of 'isbiased' lib. "
-                                             "Possible values: 'similar_words','distances','kth_sentence',"
-                                             "'cosine_similarity', 'answer_length',"
-                                             "'max_sim_ents','answer_subject_positions'")
+                                                "Possible values: 'similar_words','distances','kth_sentence',"
+                                                "'cosine_similarity', 'answer_length',"
+                                                "'max_sim_ents','answer_subject_positions'")
 parser.add_argument("--num_val_samples", type=int, help="A number of validation samples", default=200)
+parser.add_argument("--output_path", type=str, help="A number of validation samples")
 
 args = parser.parse_args()
 
@@ -50,7 +51,8 @@ mixin_objective = LearnedMixinH(lang_module,
                                 val_evaluators=[F1ScoreForQA()],
                                 objective_id="SQUAD-en",
                                 penalty=0.4,
-                                bias_scale_proportion=10)
+                                bias_scale_proportion=10,
+                                loss_weight=0.01)
 
 # bias logging:
 measurer = BiasSignificanceMeasure()
@@ -62,13 +64,27 @@ metrics, dataset = measurer.evaluate_model_on_dataset(args.full_model_path, squa
 # segments the dataset by pre-computed threshold
 biasedDataset, unbiasedDataset = measurer.split_data_by_heuristics(dataset, squad_en["train"], args.bias_id)
 
+full_dataset_objective = ExtractiveQA(lang_module,
+                                      texts_or_path=squad_train["question"],
+                                      text_pair_or_path=squad_train["context"],
+                                      labels_or_path=[a["text"][0] for a in squad_train["answers"]],
+                                      val_texts_or_path=squad_train["question"][:args.num_val_samples],
+                                      val_text_pair_or_path=squad_train["context"][:args.num_val_samples],
+                                      val_labels_or_path=[a["text"][0] for a in squad_train["answers"]][
+                                                         :args.num_val_samples],
+                                      batch_size=30,
+                                      val_evaluators=[F1ScoreForQA()],
+                                      objective_id="SQUAD-en-extractiveQA",
+                                      share_other_objective_head=mixin_objective)
+
 biased_objective = ExtractiveQA(lang_module,
                                 texts_or_path=biasedDataset["question"],
                                 text_pair_or_path=biasedDataset["context"],
                                 labels_or_path=[a["text"][0] for a in biasedDataset["answers"]],
                                 val_texts_or_path=biasedDataset["question"][:args.num_val_samples],
                                 val_text_pair_or_path=biasedDataset["context"][:args.num_val_samples],
-                                val_labels_or_path=[a["text"][0] for a in biasedDataset["answers"]][:args.num_val_samples],
+                                val_labels_or_path=[a["text"][0] for a in biasedDataset["answers"]][
+                                                   :args.num_val_samples],
                                 batch_size=30,
                                 val_evaluators=[F1ScoreForQA()],
                                 objective_id="SQUAD-en-biased",
@@ -88,7 +104,8 @@ non_biased_objective = ExtractiveQA(lang_module,
                                     share_other_objective_head=mixin_objective)
 # end: bias logging
 
-training_arguments = AdaptationArguments(output_dir="LMix-%s-%s-checkpoints" % (args.bias_id, args.trained_model),
+training_arguments = AdaptationArguments(output_dir="LMix-%s-%s-checkpoints/%s" %
+                                                    (args.bias_id, args.trained_model, args.output_path),
                                          learning_rate=5e-5,
                                          stopping_strategy=StoppingStrategy.ALL_OBJECTIVES_NUM_EPOCHS,
                                          do_train=True,
@@ -102,7 +119,7 @@ training_arguments = AdaptationArguments(output_dir="LMix-%s-%s-checkpoints" % (
                                          num_train_epochs=30,
                                          evaluation_strategy="steps")
 
-schedule = ParallelSchedule(objectives=[mixin_objective],
+schedule = ParallelSchedule(objectives=[full_dataset_objective, mixin_objective],
                             extra_eval_objectives=[biased_objective, non_biased_objective],
                             args=training_arguments)
 
