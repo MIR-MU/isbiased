@@ -1,3 +1,4 @@
+import comet_ml
 import argparse
 from typing import Tuple
 
@@ -46,8 +47,9 @@ def create_bias_dataset(dataset: Dataset, bias: PreTrainedModel) -> Dataset:
     dataset['train'] = dataset['train'].add_column('bias_probs_start', bias_start_logits.tolist())
     dataset['train'] = dataset['train'].add_column('bias_probs_end', bias_end_logits.tolist())
 
-    dataset['validation'] = dataset['validation'].add_column('bias_probs_start', bias_start_logits.tolist())
-    dataset['validation'] = dataset['validation'].add_column('bias_probs_end', bias_end_logits.tolist())
+    eval_bias_start_logits, eval_bias_end_logits = infer_model_start_end_logits(bias, dataset["validation"])
+    dataset['validation'] = dataset['validation'].add_column('bias_probs_start', eval_bias_start_logits.tolist())
+    dataset['validation'] = dataset['validation'].add_column('bias_probs_end', eval_bias_end_logits.tolist())
 
     return dataset
 
