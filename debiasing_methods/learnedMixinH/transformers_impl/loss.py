@@ -20,16 +20,18 @@ class LearnedMixinHLoss(ClfDistillLossFunction):
 
     def __init__(self,
                  penalty: float,
-                 model_hidden_size: int = 768):
+                 model_hidden_size: int = 768,
+                 scaling_portion: int = 10):
         super().__init__()
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
         self.learned_bias_scalar = torch.nn.Linear(in_features=model_hidden_size,
                                                    out_features=1,
                                                    device=self.device)
+        self.scaling_portion = scaling_portion
         self.penalty = penalty
 
-    def forward(self, logits, bias_logits, hidden_states, labels, scaling_portion: int = 10):
+    def forward(self, logits, bias_logits, hidden_states, labels):
 
         bias_scale = self.learned_bias_scalar(hidden_states)
         bias_scale = torch.nn.functional.softplus(bias_scale)
@@ -38,7 +40,7 @@ class LearnedMixinHLoss(ClfDistillLossFunction):
         biased_start_logprobs = scaled_bias_logits.log_softmax(1)
 
         cross_entropy_loss = torch.nn.CrossEntropyLoss()
-        lmix_loss = cross_entropy_loss(logits + scaled_bias_logits / scaling_portion, labels)
+        lmix_loss = cross_entropy_loss(logits + scaled_bias_logits / self.scaling_portion, labels)
 
         entropy = -(torch.exp(biased_start_logprobs) * biased_start_logprobs).sum(1).mean(0)
         entropy_penalty = self.penalty * entropy
