@@ -46,6 +46,9 @@ def create_bias_dataset(dataset: Dataset, bias: PreTrainedModel) -> Dataset:
     dataset['train'] = dataset['train'].add_column('bias_probs_start', bias_start_logits.tolist())
     dataset['train'] = dataset['train'].add_column('bias_probs_end', bias_end_logits.tolist())
 
+    dataset['validation'] = dataset['validation'].add_column('bias_probs_start', bias_start_logits.tolist())
+    dataset['validation'] = dataset['validation'].add_column('bias_probs_end', bias_end_logits.tolist())
+
     return dataset
 
 
@@ -81,7 +84,7 @@ def main():
                              "in theirs contexts.")
 
     parser.add_argument("--do_train",
-                        default=False,
+                        default=True,
                         help="Whether to run training.")
     parser.add_argument("--train_firstn",
                         default=0,
@@ -93,12 +96,12 @@ def main():
                         help="Subset of the training data. For testing.")
 
     parser.add_argument("--train_batch_size",
-                        default=4,
+                        default=32,
                         type=int,
                         help="Batch for training that fits into memory.")
     parser.add_argument('--gradient_accumulation_steps',
                         type=int,
-                        default=4,
+                        default=1,
                         help="Number of updates steps to accumulate before performing a backward/update pass.")
     parser.add_argument("--eval_batch_size",
                         default=32,
@@ -168,7 +171,7 @@ def main():
     training_args = TrainingArguments(
         output_dir=args.output_path,
         evaluation_strategy="steps",
-        eval_steps=1000,  # Evaluation and Save happens every 200 steps
+        eval_steps=1,  # Evaluation and Save happens every 200 steps
         save_steps=1000,
         logging_steps=1000,
         save_total_limit=50,  # Only last 10 models are saved. Older ones are deleted.

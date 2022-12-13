@@ -527,7 +527,7 @@ def main():
     utils.add_stdout_logger()
 
 
-    loss_fn = clf_distill_loss_functions.SmoothedDistillLoss()
+    loss_fn = clf_distill_loss_functions.LearnedMixinHLoss()
 
     output_dir = args.output_dir
 

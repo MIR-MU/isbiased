@@ -36,7 +36,7 @@ class BertDistill(BertPreTrainedModel):
 
 class DistilBertForQuestionAnswering(BertForQuestionAnswering):
     """
-    Pre-trained Distilled Bert for Question Answering which uses SmoothedDistillLoss loss function
+    Pre-trained Distilled Bert for Question Answering which uses LearnedMixinHLoss loss function
 
     Overides only to change loss function
     """
