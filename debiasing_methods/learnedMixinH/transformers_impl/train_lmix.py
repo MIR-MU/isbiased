@@ -1,5 +1,4 @@
 import argparse
-import os
 from typing import Tuple
 
 import torch
@@ -11,8 +10,6 @@ from transformers import AutoTokenizer, AutoModelForQuestionAnswering, DefaultDa
 from learnedMixinH.transformers_impl.loss import LearnedMixinHLoss
 from learnedMixinH.transformers_impl.model import LMixBertForQuestionAnswering
 from learnedMixinH.transformers_impl.utils import prepare_train_features
-
-dirname = os.getcwd()
 
 
 def infer_model_start_end_logits(qa_model: PreTrainedModel,
@@ -60,15 +57,11 @@ def main():
                         help="Model to be debiased")
     parser.add_argument("--penalty", default=0.3, type=float,
                         help="Entropy regularization penalty (H).")
-    parser.add_argument("--biased_model", default="bert-base-cased", type=str,
+    parser.add_argument("--biased_model_path", default="bert-base-cased", type=str,
                         help="Pre-trained biased model")
     parser.add_argument("--dataset", default="squad", type=str,
                         help="HuggingFace dataset name, e.g.: 'squad'")
-    parser.add_argument("--bias", default="distances", type=str,
-                        help="On which bias to train model. Supports all biases of 'isbiased' lib. "
-                             "Possible values: 'similar_words','distances','kth_sentence','cosine_similarity',"
-                             "'answer_length','max_sim_ents','answer_subject_positions'")
-    parser.add_argument("--output_dir",
+    parser.add_argument("--output_path",
                         default="./results",
                         type=str,
                         help="The output directory where the model checkpoints will be written.")
@@ -146,8 +139,6 @@ def main():
     print("Bias model:   ", args.biased_model)
     debiased_name = "debiased-lmix-" + model_checkpoint
 
-    model_save_path = os.path.join(dirname, 'saved_models', debiased_name)
-
     tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
 
     loss_fn = LearnedMixinHLoss(penalty=args.penalty)
@@ -175,7 +166,7 @@ def main():
     lmix_dataset = create_bias_dataset(tokenized_squad, bias_model)
 
     training_args = TrainingArguments(
-        output_dir=model_save_path,
+        output_dir=args.output_path,
         evaluation_strategy="steps",
         eval_steps=1000,  # Evaluation and Save happens every 200 steps
         save_steps=1000,
