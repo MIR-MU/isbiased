@@ -136,7 +136,7 @@ def main():
 
     model_checkpoint = args.trained_model
     print("Model:   ", model_checkpoint)
-    print("Bias model:   ", args.biased_model)
+    print("Bias model:   ", args.biased_model_path)
     debiased_name = "debiased-lmix-" + model_checkpoint
 
     tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
@@ -161,7 +161,7 @@ def main():
     print("Got dataset...")
     data_collator = DefaultDataCollator()
 
-    bias_model = AutoModelForQuestionAnswering.from_pretrained(args.biased_model)
+    bias_model = AutoModelForQuestionAnswering.from_pretrained(args.biased_model_path)
 
     lmix_dataset = create_bias_dataset(tokenized_squad, bias_model)
 
