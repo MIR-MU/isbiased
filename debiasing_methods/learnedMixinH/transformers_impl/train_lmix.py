@@ -173,7 +173,7 @@ def main():
     training_args = TrainingArguments(
         output_dir=args.output_path,
         evaluation_strategy="steps",
-        eval_steps=1,  # Evaluation and Save happens every 200 steps
+        eval_steps=1000,  # Evaluation and Save happens every 200 steps
         save_steps=1000,
         logging_steps=1000,
         save_total_limit=50,  # Only last 10 models are saved. Older ones are deleted.
