@@ -65,7 +65,6 @@ class DistillerTrainer(Trainer):
             labels = None
         outputs = model(**inputs)
         # Save past state if it exists
-        # TODO: this needs to be fixed and made cleaner later.
         if self.args.past_index >= 0:
             self._past = outputs[self.args.past_index]
 

@@ -116,12 +116,6 @@ class DistilBertForQuestionAnswering(BertForQuestionAnswering):
             start_positions = start_positions.clamp(0, ignored_index)
             end_positions = end_positions.clamp(0, ignored_index)
 
-            # TODO - check meaning of ignore_index
-            # loss_fct = self.loss_fn(ignore_index=ignored_index)
-            # fixme
-            # bias and teacher_preds have 2 dimensions = 0: start, 1:end
-            # start_loss = loss_fct(logits=start_logits, start_positions, bias_probs=bias_probs_start,
-            # teacher_probs=teacher_probs_start, labels=labels)
             if bias_probs_start is not None:
 
                 start_loss = self.loss_fn(logits=start_logits, bias_logits=bias_probs_start,
@@ -224,9 +218,7 @@ class DistillRobertaForQuestionAnswering(RobertaPreTrainedModel):
             start_positions = start_positions.clamp(0, ignored_index)
             end_positions = end_positions.clamp(0, ignored_index)
 
-            # TODO check meaning of ignore_index
             loss_fct = self.loss_fn()
-            # fixme
             # bias and teacher_preds have 2 dimensions = 0: start, 1:end
             start_loss = loss_fct(start_logits, start_positions, bias_probs, teacher_probs, labels)
             end_loss = loss_fct(end_logits, end_positions, bias_probs, teacher_probs, labels)
@@ -322,7 +314,6 @@ class DistillElectraForQuestionAnswering(ElectraPreTrainedModel):
 
             loss_fct = self.loss_fn()
 
-            # fixme
             # bias and teacher_preds have 2 dimensions = 0: start, 1:end
             start_loss = loss_fct(start_logits, start_positions, bias_probs, teacher_probs, labels)
             end_loss = loss_fct(end_logits, end_positions, bias_probs, teacher_probs, labels)

@@ -191,7 +191,6 @@ class BiasSignificanceMeasure:
 
         return best_threshold, max_distance, distances_dictionary
 
-    # TODO rename, something like evaluate_heuristic
     def find_longest_distance(self, dataset: Dataset, heuristic: str) -> Tuple[Tuple[float, float,
                                                                                      Dict[float, List[float]]],
                                                                                Dataset]:
