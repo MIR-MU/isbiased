@@ -476,7 +476,8 @@ class BiasSignificanceMeasure:
 
         return metrics, dataset
 
-    def compute_heuristics(self, dataset: Dataset) -> Dataset:
+    @staticmethod
+    def compute_heuristics(dataset: Dataset) -> Dataset:
         """Computes all heuristics for the dataset
 
         Args:
@@ -495,7 +496,8 @@ class BiasSignificanceMeasure:
 
         return Dataset.from_pandas(dfdataset)
 
-    def _compute_heuristic(self, dataset: pd.DataFrame, heuristic: str) -> pd.DataFrame:
+    @staticmethod
+    def _compute_heuristic(dataset: pd.DataFrame, heuristic: str) -> pd.DataFrame:
         """Computes specific heuristic for the dataset
 
         Args:
