@@ -1,0 +1,2 @@
+transformers==4.19.1
+adaptor[generative]==0.2.0
