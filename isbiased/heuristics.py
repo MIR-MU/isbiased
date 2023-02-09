@@ -15,9 +15,8 @@ nltk.download('punkt')
 nltk.download('wordnet')
 
 
-# TODO: maybe divide this into Heuristics = subclasses sharing the same interface?
 class ComputeHeuristics:
-    # TODO: whole class docstring
+
     def __init__(self, dataset: pd.DataFrame, tfidf_dataset: pd.DataFrame):
         self.data = dataset
         self.tfidf_dataset = tfidf_dataset
@@ -29,11 +28,9 @@ class ComputeHeuristics:
         Intersection between sets is computed
 
         Args:
-            # TODO: not the arg
             data (Pandas Dataframe): dataset for which you want to compute
 
         Returns:
-            # TODO: return annotation
             int: single number for similar words
         """
         tokenizer = nltk.RegexpTokenizer(r"\w+")
@@ -51,8 +48,6 @@ class ComputeHeuristics:
 
     # code from this web site https://www.codegrepper.com/code-examples/python/find+index+of+sublist+in+list+python
     def find_sub_list(self, sl, l):
-        # TODO: types
-        # TODO: public method?
         """Function for finding the index of sublist in list
 
         Args:
@@ -81,7 +76,7 @@ class ComputeHeuristics:
             data (Pandas Dataframe): dataset
 
         Returns:
-            int, str: distance of the closest word and the word  # TODO: nice, but also use return type annotation
+            int, str: distance of the closest word and the word
         """
         tokenizer = RegexpTokenizer(r'\w+')
         distances = []
@@ -132,7 +127,7 @@ class ComputeHeuristics:
             data (Pandas Dataframe): dataset
 
         Returns:
-            int: number representing the index of the sentence  # TODO: nice, but also use return type annotation
+            int: number representing the index of the sentence
         """
         sentence_indexes = []
 
@@ -157,7 +152,7 @@ class ComputeHeuristics:
             data (Pandas Dataframe): dataset
 
         Returns:
-            decimal: number representing the cosine similarity  # TODO: nice, but also use return type annotation
+            decimal: number representing the cosine similarity
         """
         vectorizer = TfidfVectorizer(stop_words='english', use_idf=True)
         model = vectorizer.fit(self.tfidf_dataset['context'])  # fit on the train dataset
@@ -179,7 +174,7 @@ class ComputeHeuristics:
             data (Pandas Dataframe): dataset
 
         Returns:
-            decimal: number representing the awerage length  # TODO: nice, but also use return type annotation
+            decimal: number representing the awerage length
         """
         answers_text = []
         for i in range(len(self.data)):
@@ -204,7 +199,7 @@ class ComputeHeuristics:
             doc (Doc): string processed with nlp()
 
         Returns:
-            list: list of entities  # TODO: nice, but also use return type annotation - FOR ALL METHODS, PLS
+            list: list of entities
         """
         entities = []
         if doc.ents:
@@ -303,7 +298,6 @@ class ComputeHeuristics:
         return positions
 
     def compute_all_heuristics(self):
-        # TODO: docs
         self.data['similar_words'] = self.count_similar_words_in_question_and_context()
         self.data['distances'], self.data[
             'closest_words'] = self.count_lowest_position_of_word_from_question_in_context()
@@ -314,7 +308,6 @@ class ComputeHeuristics:
         self.data['answer_subject_positions'] = self.extract_answer_position_with_respect_to_subject()
 
     def compute_heuristic(self, heuristic_name: str):
-        # TODO: docs
         if heuristic_name == 'similar_words':
             self.data['similar_words'] = self.count_similar_words_in_question_and_context()
         elif heuristic_name == 'distances':
@@ -332,5 +325,4 @@ class ComputeHeuristics:
             self.data['answer_subject_positions'] = self.extract_answer_position_with_respect_to_subject()
 
     def save_dataset_with_computed_heuristics(self, name: str):
-        # TODO: docs
         self.data.to_json(f"{name}_with_computed_heuristics.json", orient='records')

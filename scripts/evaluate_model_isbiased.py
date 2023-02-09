@@ -8,8 +8,8 @@ model_path = "../models/bert-base-orig"
 # model_path = 'csarron/bert-base-uncased-squad-v1'  # from SQuAD-QA model from HF
 
 split = "validation"
-# dataset = load_dataset("squad")[split]
-dataset = load_dataset("adversarial_qa", "adversarialQA")[split]
+dataset = load_dataset("squad")[split]
+# dataset = load_dataset("adversarial_qa", "adversarialQA")[split]
 # end parameters
 
 measurer = BiasSignificanceMeasure()

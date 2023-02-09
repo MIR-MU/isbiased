@@ -2,7 +2,7 @@ import argparse
 import os
 
 from datasets import load_dataset, load_from_disk
-from transformers import AutoTokenizer, AutoModelForQuestionAnswering, DefaultDataCollator, TrainingArguments, Trainer, \
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering, DefaultDataCollator, TrainingArguments, Trainer,\
     EarlyStoppingCallback
 
 import torch
@@ -222,8 +222,6 @@ def main():
     )
 
     # prediction of whole dataset - predictions of BIASED model (trained on biased examples)
-    # TODO:
-    # predictions, label_ids, metrics = trainer.predict(test_dataset=tokenized_dataset_train['train'].select(range(100)))
     predictions, label_ids, metrics = trainer.predict(test_dataset=tokenized_dataset_train['train'])
     # predictions contain outputs of net for all examples shape:
     #       2(as for start_logits and end_logits) * num_examples(dataset size) * num_outputs(output dimension of net)
@@ -232,7 +230,6 @@ def main():
     data = pd.DataFrame()
     data['start_logits'] = pd.Series(predictions[0].tolist())
     data['end_logits'] = pd.Series(predictions[1].tolist())
-    # predictions_path = os.path.join(args.preds_dir, "biased_preds" + "_" + biased_checkpoint + "_" + args.dataset +".json")
     predictions_path = get_dataset_path(get_preds_filename(args.model, args.bias, args.dataset, True))
     data.to_json(predictions_path)
 

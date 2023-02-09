@@ -1,16 +1,16 @@
-import comet_ml
 import argparse
 from typing import Tuple
 
 import torch
 from datasets import load_dataset, Dataset
+import evaluate
 from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering, DefaultDataCollator, TrainingArguments, \
-    PreTrainedModel, Trainer
+    PreTrainedModel, Trainer, EvalPrediction
 
-from learnedMixinH.transformers_impl.loss import LearnedMixinHLoss
-from learnedMixinH.transformers_impl.model import LMixBertForQuestionAnswering
-from learnedMixinH.transformers_impl.utils import prepare_train_features
+from learnedMixinH.loss import LearnedMixinHLoss
+from learnedMixinH.model import LMixBertForQuestionAnswering
+from learnedMixinH.utils import prepare_train_features
 
 
 def infer_model_start_end_logits(qa_model: PreTrainedModel,
@@ -96,6 +96,14 @@ def main():
                         default=0,
                         type=int,
                         help="Subset of the training data. For testing.")
+    parser.add_argument("--eval_steps",
+                        default=1000,
+                        type=int,
+                        help="Steps to perform evaluation.")
+    parser.add_argument("--save_steps",
+                        default=1000,
+                        type=int,
+                        help="Steps ")
 
     parser.add_argument("--train_batch_size",
                         default=32,
@@ -173,8 +181,8 @@ def main():
     training_args = TrainingArguments(
         output_dir=args.output_path,
         evaluation_strategy="steps",
-        eval_steps=1000,  # Evaluation and Save happens every 200 steps
-        save_steps=1000,
+        eval_steps=args.eval_steps,  # Evaluation and Save happens every 200 steps
+        save_steps=args.save_steps,
         logging_steps=1000,
         save_total_limit=50,  # Only last 10 models are saved. Older ones are deleted.
         learning_rate=args.learning_rate,
@@ -187,6 +195,11 @@ def main():
         remove_unused_columns=False,
     )
 
+    metric = evaluate.load("squad")
+
+    def compute_metrics(p: EvalPrediction):
+        return metric.compute(predictions=p.predictions, references=p.label_ids)
+
     trainer = Trainer(
         model=lmix_model,
         args=training_args,
@@ -194,6 +207,7 @@ def main():
         eval_dataset=lmix_dataset["validation"],
         tokenizer=tokenizer,
         data_collator=data_collator,
+        # compute_metrics=compute_metrics,
         # callbacks=[EarlyStoppingCallback(early_stopping_patience=50)]
     )
 

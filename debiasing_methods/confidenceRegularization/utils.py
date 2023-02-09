@@ -103,7 +103,7 @@ def get_preds_filename(model_name: str, bias_name: str, dataset_name: str, is_bi
 
 def get_dataset_path(filename: str):
     return os.path.join(dirname, datasets_dir, filename)
-    # TODO: this returns different path than inferred from the biased model: but not used now
+
 
 def get_model_path(filename: str):
     return os.path.join(dirname, models_dir, filename)

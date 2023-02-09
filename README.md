@@ -6,11 +6,11 @@ A library to measure biases of question answering models.
 First, install:
 
 ```shell
-pip install git+https://github.com/MIR-MU/isbiased.git
+pip install git+this_repo.git
 ```
 or for further development:
 ```shell
-git clone -b {this branch} git+https://github.com/MIR-MU/isbiased.git
+git clone -b {this branch} git+this_repo/isbiased.git
 pip install -e isbiased
 ```
 
