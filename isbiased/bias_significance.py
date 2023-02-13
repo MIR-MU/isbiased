@@ -7,7 +7,7 @@ import pandas as pd
 from datasets import Dataset
 from datasets import load_dataset, load_metric
 from tqdm.auto import tqdm
-from transformers import AutoModelForQuestionAnswering, BatchEncoding, Trainer, TrainingArguments
+from transformers import AutoModelForQuestionAnswering, AutoModelForSeq2SeqLM, BatchEncoding, Trainer, TrainingArguments
 from transformers import AutoTokenizer
 from transformers import default_data_collator
 
@@ -474,6 +474,36 @@ class BiasSignificanceMeasure:
                                                        name=m_name)
 
         return metrics, dataset
+    
+    def evaluate_instruction_model(self, model_path: str, dataset_eval: Dataset) -> Tuple[Dict[str, float], Dataset]:
+        """Evalution of selected instruction language model on selected dataset
+
+        Args:
+            model_path (str): name or path to the model
+            dataset_eval (Dataset): dataset for model evaluation
+
+        Returns:
+            Tuple[Dict[str, float], Dataset]: metrics for dataset - exact match and f1 score, and dataset
+        """
+        t = AutoTokenizer.from_pretrained(model_path)
+        m = AutoModelForSeq2SeqLM.from_pretrained(model_path)
+        formatted_predictions = []
+        predictions = []
+        
+        for item in dataset_eval:        
+            input_text = "%s %s Answer:" % (item['context'], item['question'])
+            model_input = t(input_text, return_tensors="pt")
+            model_output = m.generate(**model_input)
+
+            answer = t.batch_decode(model_output, skip_special_tokens=True)[0]
+                    
+            formatted_predictions.append({"id": item['id'], "prediction_text": answer})
+            predictions.append(answer)
+        
+        references = [{"id": ex["id"], "answers": ex["answers"]} for ex in dataset_eval]
+        data = pd.DataFrame(dataset_eval)
+        data['prediction_text'] = predictions
+        return self.metric.compute(predictions=formatted_predictions, references=references), Dataset.from_pandas(data)
 
     @staticmethod
     def compute_heuristics(dataset: Dataset) -> Dataset:
