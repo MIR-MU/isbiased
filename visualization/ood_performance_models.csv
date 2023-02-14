@@ -15,3 +15,7 @@ RoBERTa-Large,AdversarialQA,46.64
 RoBERTa-Large,NaturalQuestions,73.06
 RoBERTa-Large,TriviaQA,55.30
 RoBERTa-Large,average,58.33
+T5-Large,AdversarialQA,50.92
+T5-Large,NaturalQuestions,76.24
+T5-Large,TriviaQA,56.66
+T5-Large,average,61.27
