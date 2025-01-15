@@ -17,7 +17,7 @@ model_path = 'csarron/bert-base-uncased-squad-v1'
 # at first, we need to get predictions for our provided model and dataset, the function also computes metrics - exact match and f1
 # predictions will be added to the internal class DataFrame 
 # function also returns dataset with predictions
-metrics, dataset = bias_significance.evaluate_model_on_dataset(model_path, datasets['validation'].select(range(100)))
+metrics, dataset = bias_significance.evaluate_model_on_dataset(model_path, datasets['validation'].select(range(2000)))
 
 # function find_longest_distance() does the measuring of bias significance based on selected heuristic for every possible threshold
 # it can be used to find the best threshold - the one with highest distance between intervals
