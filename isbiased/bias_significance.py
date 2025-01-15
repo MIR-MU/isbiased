@@ -1,14 +1,15 @@
 import collections
 from statistics import mean
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Type
 
 import numpy as np
 import pandas as pd
+import transformers
 from datasets import Dataset
 from datasets import load_dataset, load_metric
 from tqdm.auto import tqdm
-from transformers import AutoModelForQuestionAnswering, AutoModelForSeq2SeqLM, BatchEncoding, Trainer, TrainingArguments
 from transformers import AutoTokenizer
+from transformers import BatchEncoding, Trainer, TrainingArguments, PreTrainedModel, PreTrainedTokenizer
 from transformers import default_data_collator
 
 from .heuristics import ComputeHeuristics
@@ -235,8 +236,30 @@ class BiasSignificanceMeasure:
         return self._find_best_threshold_for_heuristic(distances_dict), Dataset.from_pandas(dfdataset)
 
     @staticmethod
-    def evaluate_model_on_dataset(model_path: str,
-                                  dataset_eval: Dataset, batch_size: int = 8) -> Tuple[Dict[str, float], Dataset]:
+    def _try_loading_to_cls(classes: List[Type], model_path: str) -> Tuple[Type, str]:
+        # ordering of loading attempts does not matter: only one should pass successfully
+        # we will assert that!
+        loaded = False
+        for Cls in classes:
+            try:
+                new_model, log = Cls.from_pretrained(model_path, output_loading_info=True)
+                if any(v for k, v in log.items() if k in ("error_msgs", "mismatched_keys", "missing_keys")):
+                    raise ValueError("Incorrect model load: %s", log)
+                assert not loaded, "Ambiguity in choosing the correct class for the model %s" % model_path
+                model = new_model
+                loaded = True
+                print("Model %s loaded as %s" % (model_path, Cls))
+                model_type = "extractive" if Cls == transformers.AutoModelForQuestionAnswering else "generative"
+            except ValueError:
+                print("Attempt to load %s as %s not successful" % (model_path, Cls))
+                pass
+        assert loaded, "All attempts to load the model failed"
+        return model, model_type
+
+    def evaluate_model_on_dataset(self,
+                                  model_path: str,
+                                  dataset_eval: Dataset,
+                                  batch_size: int = 2) -> Tuple[Dict[str, float], Dataset]:
         """Evaluation of fine-tuned model on selected dataset
 
         Args:
@@ -247,10 +270,34 @@ class BiasSignificanceMeasure:
         Returns:
             Tuple[Dict[str, float], Dataset]: metrics for dataset - exact match and f1 score, and dataset
         """
-        squad_v2 = False
-        m_name = model_path.split("/")[-1]
+        model, mtype = BiasSignificanceMeasure._try_loading_to_cls([transformers.AutoModelForQuestionAnswering,
+                                                                    transformers.AutoModelForSeq2SeqLM,
+                                                                    transformers.AutoModelForCausalLM], model_path)
         tokenizer = AutoTokenizer.from_pretrained(model_path)
-        model = AutoModelForQuestionAnswering.from_pretrained(model_path)
+
+        if mtype == "extractive":
+            return BiasSignificanceMeasure.evaluate_extractive_model(model, tokenizer, dataset_eval, batch_size)
+        else:
+            return self.evaluate_instruction_model(model, tokenizer, dataset_eval)
+
+
+    @staticmethod
+    def evaluate_extractive_model(model: PreTrainedModel,
+                                  tokenizer: PreTrainedTokenizer,
+                                  dataset_eval: Dataset,
+                                  batch_size: int = 8) -> Tuple[Dict[str, float], Dataset]:
+        """Evaluation of fine-tuned model on selected dataset
+
+        Args:
+            model (PreTrainedModel): Pre-trained, pre-loaded HuggingFace extractive QA model
+            tokenizer (PreTrainedTokenizer): Model's associated tokenizer
+            dataset_eval (Dataset): dataset for evaluation
+            batch_size (int): size of the batch for evaluation inference
+
+        Returns:
+            Tuple[Dict[str, float], Dataset]: metrics for dataset - exact match and f1 score, and dataset
+        """
+        squad_v2 = False
         data_collator = default_data_collator
         metric = load_metric("squad_v2" if squad_v2 else "squad")
 
@@ -471,26 +518,28 @@ class BiasSignificanceMeasure:
 
         metrics, dataset = model_evaluation_on_dataset(dataset_eval,
                                                        save_dataframe_with_predictions=True,
-                                                       name=m_name)
+                                                       name=model.config.name_or_path)
 
         return metrics, dataset
     
-    def evaluate_instruction_model(self, model_path: str, dataset_eval: Dataset) -> Tuple[Dict[str, float], Dataset]:
+    def evaluate_instruction_model(self,
+                                   m: PreTrainedModel,
+                                   t: PreTrainedTokenizer,
+                                   dataset_eval: Dataset) -> Tuple[Dict[str, float], Dataset]:
         """Evalution of selected instruction language model on selected dataset
 
         Args:
-            model_path (str): name or path to the model
+            m (PreTrainedModel): Pre-trained, pre-loaded HuggingFace model that supports generate()
+            t (PreTrainedTokenizer): Model's associated tokenizer
             dataset_eval (Dataset): dataset for model evaluation
 
         Returns:
             Tuple[Dict[str, float], Dataset]: metrics for dataset - exact match and f1 score, and dataset
         """
-        t = AutoTokenizer.from_pretrained(model_path)
-        m = AutoModelForSeq2SeqLM.from_pretrained(model_path)
         formatted_predictions = []
         predictions = []
         
-        for item in dataset_eval:        
+        for item in tqdm(dataset_eval, desc="Generating predictions"):
             input_text = "%s %s Answer:" % (item['context'], item['question'])
             model_input = t(input_text, return_tensors="pt")
             model_output = m.generate(**model_input)

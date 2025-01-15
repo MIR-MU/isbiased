@@ -9,9 +9,12 @@ datasets = load_dataset("squad")
 bias_significance = BiasSignificanceMeasure()
 
 # you can use local folder with finetuned model or some qa model from huggingface
-model_path = 'models/roberta-base-finetuned-squad_with_callbacks_baseline' #path to local folder with fine-tuned model
+# the script will infer autmatically infer the correct inference implementation among extractive and generative QA
+
 # bert base model fine-tuned on squad dataset from huggingface
-# model_path = 'csarron/bert-base-uncased-squad-v1'
+model_path = 'csarron/bert-base-uncased-squad-v1'
+# t5 model fine-tuned for generative question answering
+# model_path = 'sjrhuschlee/flan-t5-base-squad2'
 
 # at first, we need to get predictions for our provided model and dataset, the function also computes metrics - exact match and f1
 # predictions will be added to the internal class DataFrame 
