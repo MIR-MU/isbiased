@@ -47,7 +47,7 @@ def print_output_jsonl(model: str, dateset: str, measure_type: str, metric: str,
 def pick_dataset(task: str, dataset: str) -> Dataset:
     if task.lower() == "qa":
         if dataset == "adversarial_qa":
-            return load_dataset("adversarial_qa", "adversarialQA")
+            return load_dataset("adversarial_qa", "adversarialQA")["validation"]
         elif dataset == "nq":
             return Dataset.from_pandas(pd.read_json(os.path.join(args.datasets_root, 'nq_dev_formatted.json')))
         elif dataset == "triviaqa":
