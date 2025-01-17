@@ -4,6 +4,7 @@ from typing import Dict, Tuple, List, Type
 
 import numpy as np
 import pandas as pd
+import torch
 import transformers
 from datasets import Dataset
 from datasets import load_dataset, load_metric
@@ -236,7 +237,7 @@ class BiasSignificanceMeasure:
         return self._find_best_threshold_for_heuristic(distances_dict), Dataset.from_pandas(dfdataset)
 
     @staticmethod
-    def _try_loading_to_cls(classes: List[Type], model_path: str) -> Tuple[Type, str]:
+    def _try_loading_to_cls(classes: List[Type], model_path: str) -> Tuple[PreTrainedModel, str]:
         # ordering of loading attempts does not matter: only one should pass successfully
         # we will assert that!
         loaded = False
@@ -538,10 +539,15 @@ class BiasSignificanceMeasure:
         """
         formatted_predictions = []
         predictions = []
+
+        if torch.cuda.is_available():
+            m = m.to("cuda")
         
         for item in tqdm(dataset_eval, desc="Generating predictions"):
             input_text = "%s %s Answer:" % (item['context'], item['question'])
             model_input = t(input_text, return_tensors="pt")
+            if torch.cuda.is_available():
+                model_input = model_input.to("cuda")
             model_output = m.generate(**model_input)
 
             answer = t.batch_decode(model_output, skip_special_tokens=True)[0]
