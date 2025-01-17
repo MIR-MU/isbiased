@@ -242,8 +242,8 @@ class BiasSignificanceMeasure:
         loaded = False
         for Cls in classes:
             try:
-                new_model, log = Cls.from_pretrained(model_path, output_loading_info=True)
-                if any(v for k, v in log.items() if k in ("error_msgs", "mismatched_keys", "missing_keys")):
+                new_model, log = Cls.from_pretrained(model_path, output_loading_info=True, trust_remote_code=True)
+                if any(v for k, v in log.items() if k in ("error_msgs", "mismatched_keys", "missing_keys", "unexpected_keys")):
                     raise ValueError("Incorrect model load: %s", log)
                 assert not loaded, "Ambiguity in choosing the correct class for the model %s" % model_path
                 model = new_model
