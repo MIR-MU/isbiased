@@ -1,4 +1,5 @@
 import collections
+import logging
 from statistics import mean
 from typing import Dict, Tuple, List, Type
 
@@ -14,6 +15,9 @@ from transformers import BatchEncoding, Trainer, TrainingArguments, PreTrainedMo
 from transformers import default_data_collator
 
 from .heuristics import ComputeHeuristics
+
+
+logger = logging.getLogger()
 
 
 class BiasSignificanceMeasure:
@@ -249,10 +253,10 @@ class BiasSignificanceMeasure:
                 assert not loaded, "Ambiguity in choosing the correct class for the model %s" % model_path
                 model = new_model
                 loaded = True
-                print("Model %s loaded as %s" % (model_path, Cls))
+                logger.warning("Model %s loaded as %s", model_path, Cls)
                 model_type = "extractive" if Cls == transformers.AutoModelForQuestionAnswering else "generative"
             except ValueError:
-                print("Attempt to load %s as %s not successful" % (model_path, Cls))
+                logger.warning("Attempt to load %s as %s not successful", model_path, Cls)
                 pass
         assert loaded, "All attempts to load the model failed"
         return model, model_type
@@ -404,7 +408,7 @@ class BiasSignificanceMeasure:
             predictions = collections.OrderedDict()
 
             # Logging.
-            print(f"Post-processing {len(examples)} example predictions split into {len(features)} features.")
+            logger.warning(f"Post-processing {len(examples)} example predictions split into {len(features)} features.")
 
             # Let's loop over all the examples!
             for example_index, example in enumerate(tqdm(examples)):
@@ -613,9 +617,9 @@ class BiasSignificanceMeasure:
         """
         threshold_distance_dictionary, ds = self.find_longest_distance(dataset_for_evaluation, heuristic)
         best_threshold, distance, dist_dict = threshold_distance_dictionary
-        # print(best_threshold)
-        # print(distance)
-        # print(dist_dict)
+        # logger.warning(best_threshold)
+        # logger.warning(distance)
+        # logger.warning(dist_dict)
 
         if best_threshold != -1:
             comp_heuristic = ComputeHeuristics(pd.DataFrame(dataset_for_split),

@@ -83,7 +83,7 @@ for model_id in args.models.split(","):
         ood_dataset = pick_dataset(args.task, ood_dataset_id)
         ood_dataset = ood_dataset.select(range(args.firstn)) if args.firstn else ood_dataset
         ood_performance, pred_dataset = bias_significance.evaluate_model_on_dataset(model_id, ood_dataset)
-        [print_output_jsonl(model_id, id_dataset_id, "perf", metric, val)
+        [print_output_jsonl(model_id, ood_dataset_id, "perf", metric, val)
          for metric, val in ood_performance.items()]
 
 # TODO: set up parameters to test locally, see what happens
