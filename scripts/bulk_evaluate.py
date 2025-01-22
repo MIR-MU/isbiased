@@ -72,6 +72,8 @@ for model_id in args.models.split(","):
     bias_significance = BiasSignificanceMeasure()
     eval_dataset = id_dataset['validation'].select(range(args.firstn)) if args.firstn else id_dataset['validation']
     id_performance, pred_dataset = bias_significance.evaluate_model_on_dataset(model_id, eval_dataset)
+    [print_output_jsonl(model_id, id_dataset_id, "perf", metric, val)
+     for metric, val in id_performance.items()]
     for shortcut in tqdm(args.shortcuts.split(","), desc="Evaluating shortcuts reliance"):
         threshold_distance_dictionary, dataset = bias_significance.find_longest_distance(pred_dataset, shortcut)
         # TODO: currently, we do not support f1-score as metric for bias distance eval
