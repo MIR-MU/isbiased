@@ -559,10 +559,10 @@ class BiasSignificanceMeasure:
         
         for item in tqdm(dataset_eval, desc="Generating predictions"):
             input_text = "%s %s Answer:" % (item['context'], item['question'])
-            model_input = t(input_text, return_tensors="pt")
+            model_input = t(input_text, return_tensors="pt", truncation=True, max_length=2000)
             if torch.cuda.is_available():
                 model_input = model_input.to("cuda")
-            model_output = m.generate(**model_input)
+            model_output = m.generate(**model_input, max_length=2048)
 
             answer = t.batch_decode(model_output, skip_special_tokens=True)[0]
                     
