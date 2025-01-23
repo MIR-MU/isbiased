@@ -17,7 +17,7 @@ from scripts.utils import eval_datasets, eval_shortcuts, pick_dataset
 parser = argparse.ArgumentParser()
 parser.add_argument("--base_model", default="EleutherAI/pythia-14m", type=str)
 parser.add_argument("--start_checkpoint", default=0, type=int)
-parser.add_argument("--end_checkpoint", default=80000, type=int)
+parser.add_argument("--end_checkpoint", default=140000, type=int)
 parser.add_argument("--checkpoint_step", default=20000, type=int)
 parser.add_argument("--task", default="QA", type=str)
 parser.add_argument("--shortcuts", help="Comma-separated list of shortcuts to evaluate. "
