@@ -48,23 +48,6 @@ train_labels = [x["answers"]["text"][0] for x in train_dataset]
 val_inputs = [INPUT_TEMPLATE % (x["context"], x["question"]) for x in val_dataset]
 val_labels = [x["answers"]["text"][0] for x in val_dataset]
 
-training_arguments = AdaptationArguments(output_dir="checkpoints-txt2sql",
-                                         learning_rate=5e-5,
-                                         stopping_strategy=StoppingStrategy.ALL_OBJECTIVES_CONVERGED,
-                                         stopping_patience=3,
-                                         save_total_limit=4,
-                                         do_train=True,
-                                         do_eval=True,
-                                         bf16=True,
-                                         warmup_steps=100,
-                                         gradient_accumulation_steps=args.train_batch_size // args.batch_size,
-                                         logging_steps=10,
-                                         eval_steps=2000,
-                                         save_steps=2000,
-                                         num_train_epochs=10,
-                                         evaluation_strategy="steps",
-                                         )
-
 
 class CausalSequence2Sequence(SequentialMixin, SupervisedObjective):
 
@@ -161,14 +144,29 @@ for checkpoint_step in range(args.start_checkpoint, args.end_checkpoint, args.ch
         seq_qa.compatible_head_model.pad_token = "<|endoftext|>"
         seq_qa.tokenizer.pad_token = "<|endoftext|>"
 
-    schedule = ParallelSchedule(objectives=[seq_qa], args=training_arguments)
-
-    adapter = Adapter(lang_module, schedule, args=training_arguments)
-
     run_config = {"num_parameters": seq_qa.compatible_head_model.num_parameters(),
                   "num_pretraining_steps": checkpoint_step}
 
     with wandb.init(project="pretraining-robustness", entity="transformersclub", config=run_config) as run:
+        training_arguments = AdaptationArguments(output_dir=f"checkpoints/run-{run.name}",
+                                                 learning_rate=5e-5,
+                                                 stopping_strategy=StoppingStrategy.ALL_OBJECTIVES_CONVERGED,
+                                                 stopping_patience=3,
+                                                 save_total_limit=4,
+                                                 do_train=True,
+                                                 do_eval=True,
+                                                 bf16=True,
+                                                 warmup_steps=5000,
+                                                 gradient_accumulation_steps=args.train_batch_size // args.batch_size,
+                                                 logging_steps=200,
+                                                 eval_steps=2000,
+                                                 save_steps=2000,
+                                                 evaluation_strategy="steps",
+                                                 )
+
+        schedule = ParallelSchedule(objectives=[seq_qa], args=training_arguments)
+        adapter = Adapter(lang_module, schedule, args=training_arguments)
+
         print("Started training %s-%s" % (args.base_model, "step%s" % checkpoint_step))
         adapter.train()
         print("Done training %s-%s" % (args.base_model, "step%s" % checkpoint_step))
