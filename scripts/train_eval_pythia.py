@@ -115,7 +115,6 @@ class CausalSequence2Sequence(SequentialMixin, SupervisedObjective):
                 labels = ([-100] * len(sample_features.input_ids)) + sample_targets.input_ids
             else:
                 labels = sample_features.input_ids + sample_targets.input_ids
-            # TODO: check what happens with labels on the loss's side
 
             features_batch.append({"input_ids": sample_features.input_ids + sample_targets.input_ids,
                                    "attention_mask": sample_features.attention_mask + sample_targets.attention_mask,
@@ -195,4 +194,3 @@ for checkpoint_step in range(args.start_checkpoint, args.end_checkpoint, args.ch
 
         wandb.log(opt_logs, step=adapter.state.global_step)
         print("Done creating logs")
-        # TODO: log number of steps and convergence distance
