@@ -1,7 +1,7 @@
 import collections
 import logging
 from statistics import mean
-from typing import Dict, Tuple, List, Type
+from typing import Dict, Tuple, List, Type, Union, Optional
 
 import numpy as np
 import pandas as pd
@@ -262,23 +262,33 @@ class BiasSignificanceMeasure:
         return model, model_type
 
     def evaluate_model_on_dataset(self,
-                                  model_path: str,
+                                  model_or_path: Union[str, PreTrainedModel],
                                   dataset_eval: Dataset,
-                                  batch_size: int = 2) -> Tuple[Dict[str, float], Dataset]:
+                                  batch_size: int = 2,
+                                  tokenizer: Optional[PreTrainedTokenizer] = None) -> Tuple[Dict[str, float], Dataset]:
         """Evaluation of fine-tuned model on selected dataset
 
         Args:
-            model_path (str): path to the QA model, it can be local path or path to model from HF hub
+            model_or_path (str): loaded model, or path to the QA model; can be a local path or model id from HF hub
             dataset_eval (Dataset): dataset for evaluation
             batch_size (int): size of the batch for evaluation inference
+            tokenizer: Pre-loaded tokenizer used when passing an already-loaded model
 
         Returns:
             Tuple[Dict[str, float], Dataset]: metrics for dataset - exact match and f1 score, and dataset
         """
-        model, mtype = BiasSignificanceMeasure._try_loading_to_cls([transformers.AutoModelForQuestionAnswering,
-                                                                    transformers.AutoModelForSeq2SeqLM,
-                                                                    transformers.AutoModelForCausalLM], model_path)
-        tokenizer = AutoTokenizer.from_pretrained(model_path)
+        if isinstance(model_or_path, str):
+            model, mtype = BiasSignificanceMeasure._try_loading_to_cls([transformers.AutoModelForQuestionAnswering,
+                                                                        transformers.AutoModelForSeq2SeqLM,
+                                                                        transformers.AutoModelForCausalLM], model_or_path)
+            tokenizer = AutoTokenizer.from_pretrained(model_or_path)
+        elif isinstance(model_or_path, PreTrainedModel):
+            # given a pre-trained model -> do not try to resolve it, just use it as-given
+            model = model_or_path
+            # TODO: this mtype resolution will fail with non-QA tasks
+            mtype = "generative" if hasattr(model, "generate") else "extractive"
+        else:
+            raise ValueError("model_or_path must contain either pre-loaded model or the model's local path/HF id.")
 
         if mtype == "extractive":
             return BiasSignificanceMeasure.evaluate_extractive_model(model, tokenizer, dataset_eval, batch_size)

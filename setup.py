@@ -41,8 +41,10 @@ setup(
         "spacy",
         "torch>=1.11.0",
         "transformers==4.28.1",
+        "adaptor",
         "accelerate>=0.26.0",
         "dill<0.3.5",
+        "wandb"
     ],
     test_require=[
         "pytest"
