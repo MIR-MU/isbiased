@@ -149,7 +149,7 @@ for checkpoint_step in range(args.start_checkpoint, args.end_checkpoint, args.ch
                   "num_pretraining_steps": checkpoint_step}
 
     with wandb.init(project="pretraining-robustness", entity="transformersclub", config=run_config) as run:
-        training_arguments = AdaptationArguments(output_dir=f"checkpoints/run-{run.name}",
+        training_arguments = AdaptationArguments(output_dir=f"checkpoints/run-{run.name}-{args.base_model}-ch{checkpoint_step}",
                                                  learning_rate=5e-5,
                                                  stopping_strategy=StoppingStrategy.ALL_OBJECTIVES_CONVERGED,
                                                  stopping_patience=3,
@@ -163,7 +163,7 @@ for checkpoint_step in range(args.start_checkpoint, args.end_checkpoint, args.ch
                                                  eval_steps=2000,
                                                  save_steps=2000,
                                                  evaluation_strategy="steps",
-                                                 num_epochs=20,
+                                                 num_train_epochs=20,
                                                  )
 
         schedule = ParallelSchedule(objectives=[seq_qa], args=training_arguments)
