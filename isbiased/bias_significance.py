@@ -285,6 +285,7 @@ class BiasSignificanceMeasure:
         elif isinstance(model_or_path, PreTrainedModel):
             # given a pre-trained model -> do not try to resolve it, just use it as-given
             model = model_or_path
+            print("Model device: %s" % model.device)
             # TODO: this mtype resolution will fail with non-QA tasks
             mtype = "generative" if hasattr(model, "generate") else "extractive"
         else:
@@ -562,7 +563,7 @@ class BiasSignificanceMeasure:
             model_input = t(input_text, return_tensors="pt", truncation=True, max_length=2000)
             if torch.cuda.is_available():
                 model_input = model_input.to("cuda")
-            model_output = m.generate(**model_input, max_length=2048)
+            model_output = m.generate(**model_input, max_new_tokens=20)
 
             answer = t.batch_decode(model_output, skip_special_tokens=True)[0]
                     

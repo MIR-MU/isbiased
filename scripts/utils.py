@@ -41,6 +41,7 @@ def eval_datasets(model_or_path: Union[str, PreTrainedModel],
                   tokenizer: Optional[PreTrainedTokenizer] = None) -> Dict[str, float]:
     out_dict = {}
     for dataset_id in dataset_ids:
+        print("Evaluating on dataset %s" % dataset_id)
         dataset = pick_dataset(task, dataset_id, dataset_root)
         dataset = dataset.select(range(firstn)) if firstn else dataset
         perf, pred_dataset = bias_significance.evaluate_model_on_dataset(model_or_path, dataset, batch_size, tokenizer)
