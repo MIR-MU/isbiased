@@ -189,7 +189,7 @@ for checkpoint_step in range(args.start_checkpoint, args.end_checkpoint, args.ch
 
         wandb.log(shortcuts_eval, step=adapter.state.global_step)
         with torch.no_grad():
-            weights_diff = compute_weights_diff(orig_model, trained_model)
+            weights_diff = compute_weights_diff(orig_model.cpu(), trained_model.cpu())
         opt_logs = {"num_steps": adapter.state.global_step, "weights_diff": wandb.Histogram(weights_diff, num_bins=512)}
 
         wandb.log(opt_logs, step=adapter.state.global_step)
