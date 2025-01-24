@@ -18,6 +18,7 @@ from datasets import load_dataset, Dataset
 from tqdm import tqdm
 
 from isbiased.bias_significance import BiasSignificanceMeasure
+from scripts.utils import pick_dataset
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--task", help="Task identifier. One of `QA`, `NLI.`", default="QA", type=str)
@@ -44,33 +45,18 @@ def print_output_jsonl(model: str, dateset: str, measure_type: str, metric: str,
     print(output_json)
 
 
-def pick_dataset(task: str, dataset: str) -> Dataset:
-    if task.lower() == "qa":
-        if dataset == "adversarial_qa":
-            return load_dataset("adversarial_qa", "adversarialQA")["validation"]
-        elif dataset == "nq":
-            return Dataset.from_pandas(pd.read_json(os.path.join(args.datasets_root, 'nq_dev_formatted.json')))
-        elif dataset == "triviaqa":
-            return Dataset.from_pandas(pd.read_json(os.path.join(args.datasets_root, 'triviaqa_dev_formatted.json')))
-        else:
-            raise ValueError("Unknown dataset %s" % dataset)
-    else:
-        # TODO: add more datasets in SQuAD format!
-        raise NotImplementedError("Unknown task %s" % task)
-
-
 if args.task.lower() == "nli":
     raise NotImplementedError("NLI task not yet implemented")
 
 for model_id in args.models.split(","):
     if args.task.lower() == "qa":
         id_dataset_id = "squad"
-        id_dataset = load_dataset(id_dataset_id)
+        id_dataset = pick_dataset(args.task, id_dataset_id, args.datasets_root)
     else:
         raise NotImplementedError("NLI task not yet implemented")
 
     bias_significance = BiasSignificanceMeasure()
-    eval_dataset = id_dataset['validation'].select(range(args.firstn)) if args.firstn else id_dataset['validation']
+    eval_dataset = id_dataset.select(range(args.firstn)) if args.firstn else id_dataset
     id_performance, pred_dataset = bias_significance.evaluate_model_on_dataset(model_id, eval_dataset)
     [print_output_jsonl(model_id, id_dataset_id, "perf", metric, val)
      for metric, val in id_performance.items()]
@@ -86,7 +72,7 @@ for model_id in args.models.split(","):
     for ood_dataset_id in args.ood_datasets.split(","):
         if not ood_dataset_id:
             continue
-        ood_dataset = pick_dataset(args.task, ood_dataset_id)
+        ood_dataset = pick_dataset(args.task, ood_dataset_id, args.datasets_root)
         ood_dataset = ood_dataset.select(range(args.firstn)) if args.firstn else ood_dataset
         ood_performance, pred_dataset = bias_significance.evaluate_model_on_dataset(model_id, ood_dataset)
         [print_output_jsonl(model_id, ood_dataset_id, "perf", metric, val)

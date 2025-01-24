@@ -25,10 +25,14 @@ def pick_dataset(task: str, dataset: str, datasets_root: str, split: str = "vali
         elif dataset == "triviaqa":
             assert split == "validation"
             return Dataset.from_pandas(pd.read_json(os.path.join(datasets_root, 'triviaqa_dev_formatted.json')))
+        elif dataset == "news_qa":
+            return Dataset.from_pandas(pd.read_json(os.path.join(datasets_root, 'news_qa_dev_2k_subset.json')))
+        elif dataset == "search_qa":
+            return Dataset.from_pandas(pd.read_json(os.path.join(datasets_root, 'search_qa_dev_2k_subset.json')))
         else:
             raise ValueError("Unknown dataset %s" % dataset)
     else:
-        # TODO: add more datasets in SQuAD format!
+        # TODO: Add NLI task & datasets
         raise NotImplementedError("Unknown task %s" % task)
 
 
