@@ -143,6 +143,7 @@ for checkpoint_step in range(args.start_checkpoint, args.end_checkpoint, args.ch
     if seq_qa.tokenizer.pad_token is None and seq_qa.tokenizer.pad_token_id is None:
         seq_qa.compatible_head_model.pad_token = "<|endoftext|>"
         seq_qa.tokenizer.pad_token = "<|endoftext|>"
+        seq_qa.tokenizer.pad_token_id = seq_qa.tokenizer.eos_token_id
 
     run_config = {"num_parameters": seq_qa.compatible_head_model.num_parameters(),
                   "num_pretraining_steps": checkpoint_step}
