@@ -566,6 +566,9 @@ class BiasSignificanceMeasure:
             model_output = m.generate(**model_input, max_new_tokens=20)
 
             answer = t.batch_decode(model_output, skip_special_tokens=True)[0]
+            # CLM: input text is always a part of generate() output -> for evaluation, we need to strip that
+            if answer.startswith(input_text):
+                answer = answer.replace(input_text, "")
                     
             formatted_predictions.append({"id": item['id'], "prediction_text": answer})
             predictions.append(answer)

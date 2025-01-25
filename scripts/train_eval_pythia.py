@@ -1,9 +1,10 @@
 import argparse
-from typing import Optional, Union, Dict, Iterable, Iterator
+from typing import Optional, Union, Dict, Iterable, Iterator, Sequence
 
 import torch
 import wandb
 from adaptor.adapter import Adapter
+from adaptor.evaluators.generative import GenerativeEvaluator, ROUGE
 from adaptor.lang_module import LangModule
 from adaptor.objectives.CLM import DataCollatorForCausalLM
 from adaptor.objectives.objective_base import SupervisedObjective, Objective
@@ -95,7 +96,7 @@ class CausalSequence2Sequence(SequentialMixin, SupervisedObjective):
             with self.tokenizer.as_target_tokenizer():
                 sample_targets = self.tokenizer(target_text, truncation=True)
             if self.mask_prompt_from_loss:
-                labels = ([-100] * len(sample_features.input_ids)) + sample_targets.input_ids
+                labels = ([-100] * len(sample_features.input_ids)) + sample_targets.input_ids + [self.tokenizer.eos_token_id]
             else:
                 labels = sample_features.input_ids + sample_targets.input_ids
 
@@ -137,6 +138,7 @@ for checkpoint_step in range(args.start_checkpoint, args.end_checkpoint, args.ch
                                      val_texts_or_path=val_inputs,
                                      val_labels_or_path=val_labels,
                                      batch_size=args.batch_size,
+                                     val_evaluators=ROUGE(),
                                      objective_id="SQuAD")
 
     # Add pad token to all models if using pythia

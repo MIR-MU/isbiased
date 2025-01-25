@@ -41,7 +41,7 @@ setup(
         "spacy",
         "torch>=1.11.0",
         "transformers==4.28.1",
-        "adaptor",
+        "adaptor[generative]",
         "accelerate>=0.26.0",
         "dill<0.3.5",
         "wandb"
