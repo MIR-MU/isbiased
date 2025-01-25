@@ -1,5 +1,5 @@
 import argparse
-from typing import Optional, Union, Dict, Iterable, Iterator, Sequence
+from typing import Optional, Union, Dict, Iterable, Iterator, Sequence, List
 
 import torch
 import wandb
@@ -110,6 +110,14 @@ class CausalSequence2Sequence(SequentialMixin, SupervisedObjective):
         if features_batch:
             # yield last nonempty residual batch
             yield self.collator(features_batch)
+
+
+class CLMRougeEvaluator(ROUGE):
+
+    compatible_heads: List[Head] = [Head.SEQ2SEQ, Head.CLM]
+
+    def __str__(self):
+        return super().__str__()
 
 
 def compute_weights_diff(orig_model: PreTrainedModel, new_model: PreTrainedModel) -> torch.Tensor:
