@@ -138,7 +138,7 @@ for checkpoint_step in range(args.start_checkpoint, args.end_checkpoint, args.ch
                                      val_texts_or_path=val_inputs,
                                      val_labels_or_path=val_labels,
                                      batch_size=args.batch_size,
-                                     val_evaluators=ROUGE(),
+                                     val_evaluators=[ROUGE()],
                                      objective_id="SQuAD")
 
     # Add pad token to all models if using pythia
