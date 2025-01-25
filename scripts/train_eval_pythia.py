@@ -1,17 +1,15 @@
 import argparse
-from typing import Optional, Union, Dict, Iterable, Iterator, Sequence, List
+from typing import Optional, Union, Dict, Iterable, Iterator, Any
 
 import torch
 import wandb
 from adaptor.adapter import Adapter
-from adaptor.evaluators.generative import GenerativeEvaluator, ROUGE
 from adaptor.lang_module import LangModule
-from adaptor.objectives.CLM import DataCollatorForCausalLM
-from adaptor.objectives.objective_base import SupervisedObjective, Objective
+from adaptor.objectives.objective_base import SupervisedObjective
 from adaptor.objectives.seq2seq import SequentialMixin
 from adaptor.schedules import ParallelSchedule
 from adaptor.utils import AdaptationArguments, StoppingStrategy, Head
-from transformers import BatchEncoding, PreTrainedModel, AutoModelForCausalLM
+from transformers import BatchEncoding, PreTrainedModel, AutoModelForCausalLM, DataCollatorForSeq2Seq
 
 from scripts.utils import eval_datasets, eval_shortcuts, pick_dataset
 
@@ -57,7 +55,8 @@ class CausalSequence2Sequence(SequentialMixin, SupervisedObjective):
     def __init__(self, *args, mask_prompt_from_loss: bool = True, **kwargs):
         super().__init__(*args, **kwargs)
         self.mask_prompt_from_loss = mask_prompt_from_loss
-        self.collator = DataCollatorForCausalLM(self.tokenizer, self.compatible_head_model)
+        self.collator = DataCollatorForSeq2Seq(self.tokenizer, self.compatible_head_model, pad_to_multiple_of=8)
+        # self.collator = DataCollatorForCausalLM(self.tokenizer, self.compatible_head_model)
 
     def _compute_loss(self,
                       lm_logit_outputs: torch.FloatTensor,
@@ -95,13 +94,16 @@ class CausalSequence2Sequence(SequentialMixin, SupervisedObjective):
 
             with self.tokenizer.as_target_tokenizer():
                 sample_targets = self.tokenizer(target_text, truncation=True)
-            if self.mask_prompt_from_loss:
-                labels = ([-100] * len(sample_features.input_ids)) + sample_targets.input_ids + [self.tokenizer.eos_token_id]
-            else:
-                labels = sample_features.input_ids + sample_targets.input_ids
 
-            features_batch.append({"input_ids": sample_features.input_ids + sample_targets.input_ids,
-                                   "attention_mask": sample_features.attention_mask + sample_targets.attention_mask,
+            input_ids = sample_features.input_ids + sample_targets.input_ids
+            if self.mask_prompt_from_loss:
+                labels = ([-100] * (len(sample_features.input_ids) - 1)) + sample_targets.input_ids + [self.tokenizer.eos_token_id]
+            else:
+                # untested branch
+                labels = sample_features.input_ids[1:] + sample_targets.input_ids + [self.tokenizer.eos_token_id]
+
+            features_batch.append({"input_ids": input_ids,
+                                   "attention_mask": [1] * len(input_ids),
                                    "labels": labels})
             if len(features_batch) == self.batch_size:
                 yield self.collator(features_batch)
@@ -174,6 +176,7 @@ for checkpoint_step in range(args.start_checkpoint, args.end_checkpoint, args.ch
                                                  save_steps=2000,
                                                  evaluation_strategy="steps",
                                                  num_train_epochs=20,
+                                                 no_cuda=args.firstn < 1000
                                                  )
 
         schedule = ParallelSchedule(objectives=[seq_qa], args=training_arguments)
