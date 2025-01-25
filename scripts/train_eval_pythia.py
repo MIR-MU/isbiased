@@ -1,9 +1,10 @@
 import argparse
-from typing import Optional, Union, Dict, Iterable, Iterator, Any
+from typing import Optional, Union, Dict, Iterable, Iterator, Any, List
 
 import torch
 import wandb
 from adaptor.adapter import Adapter
+from adaptor.evaluators.generative import ROUGE
 from adaptor.lang_module import LangModule
 from adaptor.objectives.objective_base import SupervisedObjective
 from adaptor.objectives.seq2seq import SequentialMixin
