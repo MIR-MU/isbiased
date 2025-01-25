@@ -177,7 +177,7 @@ for checkpoint_step in range(args.start_checkpoint, args.end_checkpoint, args.ch
                                                  save_steps=2000,
                                                  evaluation_strategy="steps",
                                                  num_train_epochs=20,
-                                                 no_cuda=args.firstn < 1000
+                                                 no_cuda=args.firstn and args.firstn < 1000
                                                  )
 
         schedule = ParallelSchedule(objectives=[seq_qa], args=training_arguments)
