@@ -32,6 +32,8 @@ parser.add_argument("--datasets_root", help="A path to jsons of OOD datasets in 
 parser.add_argument("--firstn", help="Number of first-n samples for each dataset to evaluate with", default=0, type=int)
 parser.add_argument("--batch_size", help="Inference batch_size", default=4, type=int)
 parser.add_argument("--train_batch_size", help="Effective training batch_size", default=32, type=int)
+parser.add_argument("--learning_rate", help="Learning rate", default=1e-6, type=float)
+parser.add_argument("--stopping_patience", help="Number of non-improving evaluations in training", default=3)
 
 args = parser.parse_args()
 
@@ -168,9 +170,9 @@ for checkpoint_step in range(args.start_checkpoint, args.end_checkpoint, args.ch
 
     with wandb.init(project="pretraining-robustness", entity="transformersclub", config=run_config) as run:
         training_arguments = AdaptationArguments(output_dir=f"checkpoints/run-{run.name}-{args.base_model}-ch{checkpoint_step}",
-                                                 learning_rate=2e-6,
+                                                 learning_rate=args.learning_rate,
                                                  stopping_strategy=StoppingStrategy.ALL_OBJECTIVES_CONVERGED,
-                                                 stopping_patience=20,
+                                                 stopping_patience=args.stopping_patience,
                                                  save_total_limit=1,
                                                  do_train=True,
                                                  do_eval=True,
