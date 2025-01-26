@@ -1,10 +1,10 @@
 import argparse
-from typing import Optional, Union, Dict, Iterable, Iterator, Any, List
+from typing import Optional, Union, Dict, Iterable, Iterator, List, Sequence
 
 import torch
 import wandb
 from adaptor.adapter import Adapter
-from adaptor.evaluators.generative import ROUGE
+from adaptor.evaluators.generative import GenerativeEvaluator
 from adaptor.lang_module import LangModule
 from adaptor.objectives.objective_base import SupervisedObjective
 from adaptor.objectives.seq2seq import SequentialMixin
@@ -16,9 +16,9 @@ from scripts.utils import eval_datasets, eval_shortcuts, pick_dataset
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--base_model", default="EleutherAI/pythia-14m", type=str)
-parser.add_argument("--start_checkpoint", default=0, type=int)
-parser.add_argument("--end_checkpoint", default=140000, type=int)
-parser.add_argument("--checkpoint_step", default=20000, type=int)
+parser.add_argument("--start_checkpoint", default=140000, type=int)
+parser.add_argument("--end_checkpoint", default=0, type=int)
+parser.add_argument("--checkpoint_step", default=-20000, type=int)
 parser.add_argument("--task", default="QA", type=str)
 parser.add_argument("--shortcuts", help="Comma-separated list of shortcuts to evaluate. "
                                         "See default value for a list of options", required=True, type=str,
@@ -75,6 +75,7 @@ class CausalSequence2Sequence(SequentialMixin, SupervisedObjective):
         loss_fct = torch.nn.CrossEntropyLoss()
         # vocab-agnostic loss circumvents incorrectly-set vocab_size of some models (e.g. mt5)
         lm_loss = loss_fct(lm_logit_outputs.flatten(end_dim=1), labels.flatten())
+        # TODO! note: self.compatible_head_model(**{k: v for k, v in inputs.items() if k != "oid"}) != lm_logit_outputs
         return lm_loss
 
     def _get_seq2seq_collated_iterator(self,
@@ -115,12 +116,16 @@ class CausalSequence2Sequence(SequentialMixin, SupervisedObjective):
             yield self.collator(features_batch)
 
 
-class CLMRougeEvaluator(ROUGE):
+class ExactMatch(GenerativeEvaluator):
 
-    compatible_heads: List[Head] = [Head.SEQ2SEQ, Head.CLM]
+    compatible_heads: List[Head] = [Head.CLM]
 
-    def __str__(self):
-        return super().__str__()
+    def evaluate_str(self, expected_list: Sequence[str], actual_list: Sequence[str]) -> float:
+        expected_stripped = [e.split("Answer:")[-1] for e in expected_list]
+        actual_stripped = [e.split("Answer:")[-1] for e in actual_list]
+        num_matching = sum(e.lower().strip() == a.lower().strip() for e, a in zip(expected_stripped, actual_stripped))
+        num_all = len(expected_stripped)
+        return num_matching / num_all
 
 
 def compute_weights_diff(orig_model: PreTrainedModel, new_model: PreTrainedModel) -> torch.Tensor:
@@ -149,7 +154,7 @@ for checkpoint_step in range(args.start_checkpoint, args.end_checkpoint, args.ch
                                      val_texts_or_path=val_inputs,
                                      val_labels_or_path=val_labels,
                                      batch_size=args.batch_size,
-                                     val_evaluators=[CLMRougeEvaluator()],
+                                     val_evaluators=[ExactMatch()],
                                      objective_id="SQuAD")
 
     # Add pad token to all models if using pythia
