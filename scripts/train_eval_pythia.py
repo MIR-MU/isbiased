@@ -33,7 +33,7 @@ parser.add_argument("--firstn", help="Number of first-n samples for each dataset
 parser.add_argument("--batch_size", help="Inference batch_size", default=4, type=int)
 parser.add_argument("--train_batch_size", help="Effective training batch_size", default=32, type=int)
 parser.add_argument("--learning_rate", help="Learning rate", default=1e-6, type=float)
-parser.add_argument("--stopping_patience", help="Number of non-improving evaluations in training", default=3)
+parser.add_argument("--stopping_patience", help="Number of non-improving evaluations in training", default=3, type=int)
 
 args = parser.parse_args()
 
