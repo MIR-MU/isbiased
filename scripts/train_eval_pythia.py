@@ -1,4 +1,5 @@
 import argparse
+from functools import lru_cache
 from typing import Optional, Union, Dict, Iterable, Iterator, List, Sequence
 
 import torch
@@ -10,7 +11,8 @@ from adaptor.objectives.objective_base import SupervisedObjective
 from adaptor.objectives.seq2seq import SequentialMixin
 from adaptor.schedules import ParallelSchedule
 from adaptor.utils import AdaptationArguments, StoppingStrategy, Head
-from transformers import BatchEncoding, PreTrainedModel, AutoModelForCausalLM, DataCollatorForSeq2Seq
+from transformers import BatchEncoding, PreTrainedModel, AutoModelForCausalLM, DataCollatorForSeq2Seq, \
+    PreTrainedTokenizer
 
 from scripts.utils import eval_datasets, eval_shortcuts, pick_dataset
 
@@ -121,6 +123,18 @@ class CausalSequence2Sequence(SequentialMixin, SupervisedObjective):
 class ExactMatch(GenerativeEvaluator):
 
     compatible_heads: List[Head] = [Head.CLM]
+
+    @staticmethod
+    @lru_cache(maxsize=10000)
+    def _autoregressive_predict_one(input_ids: torch.LongTensor,
+                                    attention_mask: torch.LongTensor,
+                                    model: torch.nn.Module,
+                                    tokenizer: PreTrainedTokenizer) -> torch.LongTensor:
+        """
+        Performs a generation for a single input batch. The results are meant to be cached,
+        so that other generative evaluators do not perform a generation repeatedly.
+        """
+        return model.generate(input_ids=input_ids, attention_mask=attention_mask, max_new_tokens=50).detach().cpu()
 
     def evaluate_str(self, expected_list: Sequence[str], actual_list: Sequence[str]) -> float:
         expected_stripped = [e.split("Answer:")[-1] for e in expected_list]
