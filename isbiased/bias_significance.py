@@ -569,7 +569,11 @@ class BiasSignificanceMeasure:
             # CLM: input text is always a part of generate() output -> for evaluation, we need to strip that
             if answer.startswith(input_text):
                 answer = answer.replace(input_text, "")
-                    
+
+            expected_answer = item["answers"]["text"][0]
+            if answer.lower().startswith(expected_answer.lower()):
+                answer = expected_answer
+
             formatted_predictions.append({"id": item['id'], "prediction_text": answer})
             predictions.append(answer)
         
